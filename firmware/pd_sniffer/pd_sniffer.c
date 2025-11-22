@@ -49,7 +49,9 @@ int _write(int fd, char *ptr, int len) {
     for (int i=0; i<len; i++) usart_send_blocking(USART2, ptr[i]);
     return len;
 }
-static char usart_getc(void) { return usart_recv_blocking(USART2); }
+static char usart_getc(void) { 
+    return usart_recv_blocking(USART2); 
+}
 
 /* I2C helpers */
 /*
@@ -77,6 +79,34 @@ static int fusb_read_reg_nbytes(uint8_t reg, uint8_t *buf, size_t nbytes) {
     return 0;
 }
 
+static bool i2c_probe_addr(uint8_t addr) {
+
+    /* clear flags */
+    I2C_ICR(I2C1) = I2C_ICR_NACKCF | I2C_ICR_STOPCF;
+
+    /* send address */
+    I2C_CR2(I2C1) =
+        (addr << 1) |      // address in bits 7:1
+        (0 << 16)  |       // number of bytes
+        I2C_CR2_START;     // generate START
+
+    /* wait for either ACK or NACK */
+    while (1) {
+        uint32_t isr = I2C_ISR(I2C1);
+
+        if (isr & I2C_ISR_NACKF) {
+            I2C_ICR(I2C1) = I2C_ICR_STOPCF | I2C_ICR_NACKCF;
+            return false;  // NACK → no device
+        }
+
+        if (isr & I2C_ISR_STOPF) {
+            I2C_ICR(I2C1) = I2C_ICR_STOPCF;
+            return true;   // STOP with no NACK → device responded
+        }
+    }
+}
+
+
 /* CLI parser */
 static void handle_command(char *line) {
     if (line[0] == 'r') {
@@ -96,9 +126,9 @@ static void handle_command(char *line) {
     } else if (line[0] == 's') {
         printf("Scanning I2C...\r\n");
         for (uint8_t addr=1; addr<0x7F; addr++) {
-            uint8_t reg=0;
-            i2c_transfer7(I2C1, addr, &reg, 1, NULL, 0);
-            printf("Probed 0x%02X\r\n", addr);
+            if (i2c_probe_addr(addr)) {
+                printf("Probed 0x%02X\r\n", addr);
+            }
         }
     } else if (line[0] == 'b') {
         char *p = strtok(&line[1], " ");
