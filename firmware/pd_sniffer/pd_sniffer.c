@@ -79,6 +79,21 @@ static int fusb_read_reg_nbytes(uint8_t reg, uint8_t *buf, size_t nbytes) {
     return 0;
 }
 
+static void fusb_write_reg_nbytes(uint8_t reg, const uint8_t *buf, size_t nbytes) {
+    uint8_t wbuf_size = 1 + nbytes;
+    uint8_t *wbuf = malloc(wbuf_size);
+    wbuf[0] = reg;
+    memcpy(&wbuf[1], buf, nbytes);
+    i2c_transfer7(I2C1, FUSB302_ADDR, wbuf, 1 + nbytes, NULL, 0);
+}
+
+static bool fusb_check_i2c_addr(uint8_t addr) {
+    i2c_transfer7(I2C1, addr, NULL, 0, NULL, 0);
+    bool ack = !(I2C_ISR(I2C1) & I2C_ISR_NACKF);
+    return ack;
+}
+
+/* low level i2c scan */
 static bool i2c_probe_addr(uint8_t addr) {
 
     /* clear flags */
