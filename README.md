@@ -7,4 +7,4 @@ My goal is to implement a simple tool for sniffing USB-C PD packets.
 ### Dev Board
 ![DevBoardPreview](assets/pd_board.png)
 
-A real image will be added when the new board arrives.
+![DevBoard](assets/real_board.jpg)

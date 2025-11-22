@@ -82,6 +82,40 @@ static const struct usb_cdc_union_descriptor cdc_union = {
     .bSubordinateInterface0 = 1,
 };
 
+static const struct {
+    struct usb_cdc_header_descriptor header;
+    struct usb_cdc_call_management_descriptor call_mgmt;
+    struct usb_cdc_acm_descriptor acm;
+    struct usb_cdc_union_descriptor cdc_union;
+} cdc_functional_descriptors = {
+    .header = {
+        .bFunctionLength = sizeof(cdc_header),
+        .bDescriptorType = CS_INTERFACE,
+        .bDescriptorSubtype = USB_CDC_TYPE_HEADER,
+        .bcdCDC = 0x0110,
+    },
+    .call_mgmt = {
+        .bFunctionLength = sizeof(cdc_call_mgmt),
+        .bDescriptorType = CS_INTERFACE,
+        .bDescriptorSubtype = USB_CDC_TYPE_CALL_MANAGEMENT,
+        .bmCapabilities = 0,
+        .bDataInterface = 1,
+    },
+    .acm = {
+        .bFunctionLength = sizeof(cdc_acm),
+        .bDescriptorType = CS_INTERFACE,
+        .bDescriptorSubtype = USB_CDC_TYPE_ACM,
+        .bmCapabilities = 0,
+    },
+    .cdc_union = {
+        .bFunctionLength = sizeof(cdc_union),
+        .bDescriptorType = CS_INTERFACE,
+        .bDescriptorSubtype = USB_CDC_TYPE_UNION,
+        .bControlInterface = 0,
+        .bSubordinateInterface0 = 1,
+    },
+};
+
 static const struct usb_interface_descriptor comm_iface[] = {{
     .bLength = USB_DT_INTERFACE_SIZE,
     .bDescriptorType = USB_DT_INTERFACE,
@@ -94,12 +128,8 @@ static const struct usb_interface_descriptor comm_iface[] = {{
     .iInterface = 0,
 
     .endpoint = comm_endp,
-    .extra = &(const struct { struct usb_cdc_header_descriptor header;
-                              struct usb_cdc_call_management_descriptor call_mgmt;
-                              struct usb_cdc_acm_descriptor acm;
-                              struct usb_cdc_union_descriptor cdc_union; })
-              { cdc_header, cdc_call_mgmt, cdc_acm, cdc_union },
-    .extralen = sizeof(cdc_header)+sizeof(cdc_call_mgmt)+sizeof(cdc_acm)+sizeof(cdc_union),
+    .extra = &cdc_functional_descriptors,
+    .extralen = sizeof(cdc_functional_descriptors),
 }};
 
 static const struct usb_interface_descriptor data_iface[] = {{
