@@ -1,4 +1,22 @@
+/*
+ * fusb302.h
+ *
+ * Bare-metal definitions and simple helpers for FUSB302 USB Type-C controller
+ */
 
+#ifndef FUSB302_H
+#define FUSB302_H
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+typedef unsigned int   uint32_t;
+typedef unsigned short uint16_t;
+typedef unsigned char  uint8_t;
+typedef signed int     int32_t;
+typedef signed short   int16_t;
+typedef signed char    int8_t;
 
 #define FUSB302_ADDR                0x22   // 7-bit address
 
@@ -26,3 +44,10 @@
 #define FUSB302_REG_STATUS1         0x41
 #define FUSB302_REG_INTERRUPT       0x42
 #define FUSB302_REG_FIFOS           0x43
+
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* FUSB302_H */
