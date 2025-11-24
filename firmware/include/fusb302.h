@@ -45,6 +45,42 @@ typedef signed char    int8_t;
 #define FUSB302_REG_INTERRUPT       0x42
 #define FUSB302_REG_FIFOS           0x43
 
+/* SWITCHES0 Bits */
+#define SW0_CC2_PU_EN        (1 << 7)   // 1: apply host pull-up current to CC2 pin
+#define SW0_CC1_PU_EN        (1 << 6)   // 1: apply host pull-up current to CC1 pin
+#define SW0_VCONN_CC2_EN     (1 << 5)   // 1: turn on VCONN current to CC2 pin
+#define SW0_VCONN_CC1_EN     (1 << 4)   // 1: turn on VCONN current to CC1 pin
+#define SW0_MEAS_CC2         (1 << 3)   // 1: measure voltage on CC2 pin
+#define SW0_MEAS_CC1         (1 << 2)   // 1: measure voltage on CC1 pin
+#define SW0_PDWN2            (1 << 1)   // 1: device pull down on CC2. 0: no pull down
+#define SW0_PDWN1            (1 << 0)   // 1: device pull down on CC1. 0: no pull down
+
+/* SWITCHES1 Bits */
+#define SW1_POWERROLE  (1 << 7)
+#define SW1_SPECREV1   (1 << 6)
+#define SW1_SPECREV0   (1 << 5)
+#define SW1_DATAROLE   (1 << 4)
+#define SW1_AUTO_CRC   (1 << 2)
+#define SW1_TXCC2      (1 << 1)
+#define SW1_TXCC1      (1 << 0)
+
+/* CONTROL0 Bits */
+#define CTL0_TX_FLUSH   (1 << 6)
+#define CTL0_INT_MASK   (1 << 5)
+#define CTL0_HOST_CUR_POS 2
+#define CTL0_HOST_CUR_MASK (3 << CTL0_HOST_CUR_POS)
+#define CTL0_AUTO_PRE   (1 << 1)
+#define CTL0_TX_START   (1 << 0)
+
+/* CONTROL2 Bits */
+#define CTL2_TOG_SAVE_PWR2 (1 << 7)
+#define CTL2_TOG_SAVE_PWR1 (1 << 6)
+#define CTL2_TOG_RD_ONLY   (1 << 5)
+#define CTL2_WAKE_EN       (1 << 3)
+#define CTL2_MODE_POS      1
+#define CTL2_MODE_MASK     (3 << CTL2_MODE_POS)
+#define CTL2_TOGGLE        (1 << 0)
+
 
 #ifdef __cplusplus
 }
