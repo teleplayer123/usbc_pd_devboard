@@ -56,21 +56,29 @@ typedef signed char    int8_t;
 #define SW0_PDWN1            (1 << 0)   // 1: device pull down on CC1. 0: no pull down
 
 /* SWITCHES1 Bits */
-#define SW1_POWERROLE  (1 << 7)
-#define SW1_SPECREV1   (1 << 6)
-#define SW1_SPECREV0   (1 << 5)
-#define SW1_DATAROLE   (1 << 4)
-#define SW1_AUTO_CRC   (1 << 2)
-#define SW1_TXCC2      (1 << 1)
-#define SW1_TXCC1      (1 << 0)
+#define SW1_POWERROLE       (1 << 7)
+#define SW1_SPECREV1        (1 << 6)
+#define SW1_SPECREV0        (1 << 5)
+#define SW1_DATAROLE        (1 << 4)
+#define SW1_AUTO_CRC        (1 << 2)
+#define SW1_TXCC2           (1 << 1)
+#define SW1_TXCC1           (1 << 0)
 
 /* CONTROL0 Bits */
-#define CTL0_TX_FLUSH   (1 << 6)
-#define CTL0_INT_MASK   (1 << 5)
-#define CTL0_HOST_CUR_POS 2
-#define CTL0_HOST_CUR_MASK (3 << CTL0_HOST_CUR_POS)
-#define CTL0_AUTO_PRE   (1 << 1)
-#define CTL0_TX_START   (1 << 0)
+#define CTL0_TX_FLUSH       (1 << 6)
+#define CTL0_INT_MASK       (1 << 5)
+#define CTL0_HOST_CUR_POS   2
+#define CTL0_HOST_CUR_MASK  (3 << CTL0_HOST_CUR_POS)
+#define CTL0_AUTO_PRE       (1 << 1)
+#define CTL0_TX_START       (1 << 0)
+
+/* CONTROL1 Bits */
+#define FUSB_CTL1_ENSOP2DB      (1 << 6)
+#define FUSB_CTL1_ENSOP1DB      (1 << 5)
+#define FUSB_CTL1_BIST_MODE2    (1 << 4)
+#define FUSB_CTL1_RX_FLUSH      (1 << 2)
+#define FUSB_CTL1_ENSOP2        (1 << 1)
+#define FUSB_CTL1_ENSOP1        (1 << 0)    
 
 /* CONTROL2 Bits */
 #define CTL2_TOG_SAVE_PWR2 (1 << 7)
