@@ -236,42 +236,40 @@ int fusb302_read_packet(fusb302_packet_t *pkt)
     size_t header_received = 0;
     pkt->payload_len = 0;
 
-    while (1) {
-        uint8_t tok;
-        if (fusb302_fifo_read_byte(&tok)) return -3;
 
-        /* PACKSYM: 0b100xxxxx (0x80..0x9F) */
-        if ((tok & 0xE0) == 0x80) {
-            uint8_t count = tok & 0x1F;
-            for (uint8_t i = 0; i < count; ++i) {
-                uint8_t d;
-                if (fusb302_fifo_read_byte(&d)) return -3;
+    uint8_t tok;
+    if (fusb302_fifo_read_byte(&tok)) return -3;
 
-                if (in_packet) {
-                    if (!seen_header) {
-                        /* Fill header (two bytes) first */
-                        if (header_received == 0) {
-                            pkt->header[0] = d;
-                            header_received = 1;
-                        } else if (header_received == 1) {
-                            pkt->header[1] = d;
-                            header_received = 2;
-                            seen_header = 1;
-                        } else {
-                            printf("Unexpected header byte received: %02X\n", d);
-                        }
+    /* PACKSYM: 0b100xxxxx (0x80..0x9F) */
+    if ((tok & 0xE0) == 0x80) {
+        uint8_t count = tok & 0x1F;
+        for (uint8_t i = 0; i < count; ++i) {
+            uint8_t d;
+            if (fusb302_fifo_read_byte(&d)) return -3;
+
+            if (in_packet) {
+                if (!seen_header) {
+                    /* Fill header (two bytes) first */
+                    if (header_received == 0) {
+                        pkt->header[0] = d;
+                        header_received = 1;
+                    } else if (header_received == 1) {
+                        pkt->header[1] = d;
+                        header_received = 2;
+                        seen_header = 1;
                     } else {
-                        if (pkt->payload_len < sizeof(pkt->payload)) {
-                            pkt->payload[pkt->payload_len++] = d;
-                        }
+                        printf("Unexpected header byte received: %02X\n", d);
                     }
                 } else {
-                    printf("Data byte received outside of packet: %02X\n", d);
+                    if (pkt->payload_len < sizeof(pkt->payload)) {
+                        pkt->payload[pkt->payload_len++] = d;
+                    }
                 }
+            } else {
+                printf("Data byte received outside of packet: %02X\n", d);
             }
-            /* after reading data, loop for next token */
-            continue;
         }
+
 
         /* SOP tokens detection: top-3 bits (111,110,101) */
         uint8_t top3 = (tok & 0xE0);
@@ -284,9 +282,6 @@ int fusb302_read_packet(fusb302_packet_t *pkt)
             if (top3 == 0xE0) pkt->sop = FUSB302_SOP_SOP;
             else if (top3 == 0xC0) pkt->sop = FUSB302_SOP_SOP_PRIME;
             else pkt->sop = FUSB302_SOP_SOP_DPRIME;
-
-            /* continue to next token (PACKSYM expected) */
-            continue;
         }
 
         /* EOP token (0x14) signals end of packet (per datasheet tokens table) */
@@ -297,7 +292,6 @@ int fusb302_read_packet(fusb302_packet_t *pkt)
                     return 0;
                 }
             }
-            continue;
         }
 
         /* Other tokens - if we encounter new SOP when building packet, we can treat current as complete */
@@ -313,11 +307,8 @@ int fusb302_read_packet(fusb302_packet_t *pkt)
             return 0;
         }
 
-        /* Otherwise continue reading tokens */
     }
-
-    /* unreachable */
-    // return 0;
+    return 0;
 }
 
 /* Dump packet to stdout (printf) for debugging */
@@ -418,6 +409,7 @@ void fusb302_poll_and_dump(uint8_t n_packets)
                 count++;
             } else {
                 printf("Error: fusb302_read_packet rc=%d\n", rc);
+                break;
             }
         }
     }
