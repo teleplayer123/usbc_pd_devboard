@@ -5,10 +5,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-
 #include "fusb302.h"
 
-#define FUSB302_ADDR  0x22   // 7-bit address
 
 static void clock_setup(void) {
     rcc_clock_setup_in_hsi_out_48mhz();
@@ -128,15 +126,15 @@ static int fusb302_i2c_write(uint8_t reg, const uint8_t *buf, size_t len)
     if (len)
         memcpy(&txbuf[1], buf, len);
 
-    int rc = i2c_transfer7(I2C1, FUSB302_I2C_ADDR, txbuf, (uint32_t)(len + 1), NULL, 0);
-    return (rc == 0) ? 0 : -2;
+    i2c_transfer7(I2C1, FUSB302_ADDR, txbuf, (uint32_t)(len + 1), NULL, 0);
+    return 0;
 }
 
 /* Read N bytes starting at register 'reg' (writes reg then reads len bytes) */
 static int fusb302_i2c_read(uint8_t reg, uint8_t *buf, size_t len)
 {
-    int rc = i2c_transfer7(I2C1, FUSB302_I2C_ADDR, &reg, 1, buf, (uint32_t)len);
-    return (rc == 0) ? 0 : -2;
+    i2c_transfer7(I2C1, FUSB302_ADDR, &reg, 1, buf, (uint32_t)len);
+    return 0;
 }
 
 /* ---------- register read/write ---------- */
