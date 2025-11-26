@@ -396,10 +396,15 @@ void fusb302_poll_and_dump(uint8_t n_packets)
 {
     fusb302_packet_t pkt;
     uint8_t count = 0;
+    uint8_t retries = 3;
     printf("Starting FUSB302 packet dump...\r\n");
     while (1) {
         if (count >= n_packets) {
             printf("Completed dumping %u packets.\r\n", count);
+            break;
+        }
+        if (count == 0 && retries == 0) {
+            printf("No packets received after retries, exiting.\r\n");
             break;
         }
         if (fusb302_rx_available()) {
@@ -412,6 +417,8 @@ void fusb302_poll_and_dump(uint8_t n_packets)
                 break;
             }
         }
+        retries--;
+        for (int i=0; i<100000; i++); /* simple delay */
     }
     printf("FUSB302 packet dump finished.\r\n");
 }
