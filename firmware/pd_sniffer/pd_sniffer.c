@@ -190,8 +190,7 @@ static int fusb302_fifo_read_byte(uint8_t *b)
 int fusb302_rx_available(void)
 {
     uint8_t status1;
-    if (fusb302_read_reg(FUSB302_REG_STATUS1, &status1))
-        return 0;
+    if (fusb302_read_reg(FUSB302_REG_STATUS1, &status1)) return 0;
     return ((status1 & FUSB302_STATUS1_RX_EMPTY) == 0) ? 1 : 0;
 }
 
@@ -209,13 +208,16 @@ int fusb302_read_packet(fusb302_packet_t *pkt)
     if (!pkt) return -1;
     memset(pkt, 0, sizeof(*pkt));
 
-    /* Wait until RX FIFO not empty */
     uint8_t status1;
-    for (;;) {
-        if (fusb302_read_reg(FUSB302_REG_STATUS1, &status1)) return -2;
-        if ((status1 & FUSB302_STATUS1_RX_EMPTY) == 0) break;
-        /* Nothing available: you may want to sleep/yield in your application */
+
+    if (fusb302_read_reg(FUSB302_REG_STATUS1, &status1)) return -2;
+    if ((status1 & FUSB302_STATUS1_RX_EMPTY) == 0) {
+        printf("Data available in FIFO, starting read...\n");
+    } else {
+        /* no data */
+        return -4;
     }
+        
 
     /* Now parse tokens. Approach:
      *  - Read token bytes from FIFO until we assemble a packet:
@@ -476,7 +478,7 @@ static void handle_command(char *line) {
         fusb302_init_debug();
         fusb302_poll_and_dump(n_packets);
     } else {
-        printf("Commands:\r\n  r <reg>\r\n  w <reg> <val>\r\n  s (scan)\r\n  b <reg>\r\n  n <reg> <val1> <val2> ...\r\n f <n_packets>\r\n");
+        printf("Commands:\r\n  r <reg>\r\n  w <reg> <val>\r\n  s (scan)\r\n  b <reg>\r\n  n <reg> <val1> <val2> ...\r\n  f <n_packets>\r\n");
     }
 }
 

@@ -5,8 +5,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-
-#define FUSB302_ADDR  0x22   // 7-bit address
+#include "fusb302.h"
 
 static void clock_setup(void) {
     rcc_clock_setup_in_hsi_out_48mhz();
