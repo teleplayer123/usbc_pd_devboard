@@ -5,7 +5,7 @@
  * I2C Address
  * ----------------------------------------------------------- */
 
-#define FUSB302_I2C_ADDR            0x22
+#define FUSB302_ADDR            0x22
 
 /* -----------------------------------------------------------
  * Register Addresses
@@ -111,7 +111,7 @@
 #define FUSB302_CTL2_MODE_DRP       (2 << FUSB302_CTL2_MODE_POS)
 
 /* -----------------------------------------------------------
- * CONTROL3 (0x09)  — CORRECTED: hard reset = bit 6
+ * CONTROL3 (0x09)
  * ----------------------------------------------------------- */
 #define FUSB302_CTL3_SEND_HARD_RESET (1 << 6)
 #define FUSB302_CTL3_BIST_TMODE     (1 << 5)

@@ -1,12 +1,213 @@
+/**
+ * FUSB302 USB PD Message Sniffer - UART Console Version
+ * Target: STM32F072CB (using libopencm3)
+ * Functions: UART Console, I2C, and FUSB302 configuration for PD Sniffing.
+ */
+
 #include <libopencm3/stm32/rcc.h>
 #include <libopencm3/stm32/gpio.h>
-#include <libopencm3/stm32/usart.h>
 #include <libopencm3/stm32/i2c.h>
-#include <stdio.h>
+#include <libopencm3/stm32/usart.h>
+#include <libopencm3/cm3/nvic.h>
+
 #include <string.h>
-#include <stdlib.h>
+#include <stdio.h>
+#include <stdarg.h>
 #include "fusb302.h"
 
+// --- UART Console Functions ---
+
+/**
+ * @brief Sends a single character over USART2 (blocking).
+ */
+static void usart_send_char(char c) {
+    usart_send_blocking(USART2, c);
+}
+
+/**
+ * @brief Custom printf equivalent using USART2.
+ */
+static void uart_printf(const char *format, ...) {
+    char buf[128];
+    va_list args;
+    va_start(args, format);
+    vsnprintf(buf, sizeof(buf), format, args);
+    va_end(args);
+
+    for (const char *p = buf; *p; p++) {
+        usart_send_char(*p);
+        // Handle newline conversion for terminal compatibility
+        if (*p == '\n') {
+            usart_send_char('\r');
+        }
+    }
+}
+
+
+// --- I2C Communication Functions ---
+
+/**
+ * @brief Performs a generic I2C write transaction (RegAddr + Data).
+ */
+static int i2c_write_byte(uint8_t reg_addr, uint8_t data) {
+    uint8_t buffer[2] = {reg_addr, data};
+    
+    i2c_set_7bit_address(I2C1, FUSB302_I2C_ADDR);
+    i2c_set_bytes_to_transfer(I2C1, 2);
+    i2c_set_write_transfer_dir(I2C1);
+    i2c_enable_autoend(I2C1);
+    i2c_send_start(I2C1);
+    
+    for (int i = 0; i < 2; i++) {
+        uint32_t timeout = 0x10000;
+        while (!((I2C_ISR(I2C1) & I2C_ISR_TXIS) || (I2C_ISR(I2C1) & I2C_ISR_NACKF)) && timeout) { timeout--; }
+        if (I2C_ISR(I2C1) & I2C_ISR_NACKF) { i2c_clear_nack(I2C1); i2c_send_stop(I2C1); return -1; }
+        if (timeout == 0) { return -1; }
+        i2c_send_byte(I2C1, buffer[i]);
+    }
+    
+    uint32_t timeout = 0x10000;
+    while (!(I2C_ISR(I2C1) & I2C_ISR_STOPF) && timeout) { timeout--; }
+    i2c_clear_stop(I2C1);
+    
+    if (I2C_ISR(I2C1) & I2C_ISR_NACKF) {
+        i2c_clear_nack(I2C1);
+        uart_printf("I2C NACK on write.\n");
+        return -1;
+    }
+    
+    return 0;
+}
+
+/**
+ * @brief Performs an I2C multi-byte read transaction (RegAddr write + read N bytes).
+ * Used here for reading the RX FIFO (FUSB302_REG_FIFOS).
+ */
+static int i2c_read_multi(uint8_t reg_addr, uint8_t *data, uint8_t len) {
+    // 1. Write Register Address (Setup Phase)
+    i2c_set_7bit_address(I2C1, FUSB302_I2C_ADDR);
+    i2c_set_bytes_to_transfer(I2C1, 1);
+    i2c_set_write_transfer_dir(I2C1);
+    i2c_disable_autoend(I2C1); 
+    i2c_send_start(I2C1);
+    
+    uint32_t timeout = 0x10000;
+    while (!((I2C_ISR(I2C1) & I2C_ISR_TXIS) || (I2C_ISR(I2C1) & I2C_ISR_NACKF)) && timeout) { timeout--; }
+    if (I2C_ISR(I2C1) & I2C_ISR_NACKF) { i2c_clear_nack(I2C1); i2c_send_stop(I2C1); return -1; }
+    i2c_send_byte(I2C1, reg_addr);
+    
+    timeout = 0x10000;
+    while (!(I2C_ISR(I2C1) & I2C_ISR_TC) && timeout) { timeout--; }
+
+    // 2. Read Data (Repeated Start Phase)
+    i2c_set_7bit_address(I2C1, FUSB302_I2C_ADDR);
+    i2c_set_bytes_to_transfer(I2C1, len);
+    i2c_set_read_transfer_dir(I2C1);
+    i2c_enable_autoend(I2C1); 
+    i2c_send_start(I2C1);
+    
+    for (int i = 0; i < len; i++) {
+        timeout = 0x10000;
+        while (!(I2C_ISR(I2C1) & I2C_ISR_RXNE) && timeout) { timeout--; }
+        if (timeout == 0) { uart_printf("I2C Read Timeout.\n"); i2c_send_stop(I2C1); return -1; }
+        data[i] = i2c_get_received_byte(I2C1);
+    }
+    
+    // Wait for STOPF (transfer complete)
+    timeout = 0x10000;
+    while (!(I2C_ISR(I2C1) & I2C_ISR_STOPF) && timeout) { timeout--; }
+    i2c_clear_stop(I2C1);
+
+    return 0;
+}
+
+
+// --- FUSB302 PD Sniffer Configuration and Monitoring ---
+
+static int fusb302_sniffer_setup(void) {
+    int result;
+    
+    uart_printf("Initializing FUSB302 for PD Sniffing...\n");
+    
+    // 1. Soft Reset: Reset ALL (masking, PD state, switches, etc)
+    if (i2c_write_byte(FUSB302_REG_RESET, 0x07) != 0) {
+        uart_printf("FUSB302 Error: Failed to write RESET register.\n");
+        return -1;
+    }
+    
+    // 2. Configure Switches for Passive Sniffing
+    // SWITCHES0 (0x02): All off. (CC1_PU/PD, CC2_PU/PD, VBUS, etc.)
+    if (i2c_write_byte(FUSB302_REG_SWITCHES0, 0x00) != 0) { result = -2; goto error_exit; }
+
+    // SWITCHES1 (0x03): Set to monitor CC1 AND CC2 for reception.
+    // RX_CC1 (bit 0) | RX_CC2 (bit 1) = 0x03
+    if (i2c_write_byte(FUSB302_REG_SWITCHES1, 0x03) != 0) { result = -3; goto error_exit; }
+    
+    // 3. Configure Control Registers
+    // CONTROL1 (0x0D): Clear RX_FLUSH (bit 6) to prepare FIFO for new messages.
+    if (i2c_write_byte(FUSB302_REG_CONTROL1, 0x00) != 0) { result = -4; goto error_exit; }
+    
+    // CONTROL2 (0x0E): Set Mode to PD Monitoring (MODE[1:0] = 10b). 
+    // This enables the PD core into a listening state (0x02 << 4) = 0x20.
+    if (i2c_write_byte(FUSB302_REG_CONTROL2, 0x20) != 0) { result = -5; goto error_exit; }
+    
+    uart_printf("FUSB302 Sniffer is configured and listening.\n");
+    return 0;
+
+error_exit:
+    uart_printf("FUSB302 Error during setup sequence: Code %d\n", result);
+    return result;
+}
+
+/**
+ * @brief Checks FUSB302 status and reads any captured PD messages from the FIFO.
+ */
+static void check_and_read_fifo(void) {
+    uint8_t status0;
+    
+    // 1. Read STATUS0 (0x40) to check RX_FULL bit (bit 5) and RX_EMPTY bit (bit 6)
+    // We read STATUS0 multiple times to check the RX_EMPTY state correctly.
+    if (i2c_read_multi(FUSB302_REG_STATUS0, &status0, 1) != 0) {
+        uart_printf("Error: Cannot read STATUS0.\n");
+        return;
+    }
+
+    // Check if the RX_FULL flag is set (PD message received)
+    if (status0 & (1 << 5)) {
+        
+        uint8_t rx_data_buffer[80]; 
+        uint8_t byte_count = 0;
+        
+        uart_printf("\n--- PD Message Captured ---\n");
+        uart_printf("Raw FIFO Bytes (HEX): ");
+
+        // Read all available bytes until RX_EMPTY is set.
+        do {
+            uint8_t fifo_byte;
+            // Read one byte from the FIFO register (0x44)
+            if (i2c_read_multi(FUSB302_REG_FIFOS, &fifo_byte, 1) != 0) {
+                 uart_printf(" (FIFO Read Fail) ");
+                 break;
+            }
+            rx_data_buffer[byte_count++] = fifo_byte;
+            uart_printf("%02X ", fifo_byte);
+            
+            if (byte_count > 80) { 
+                uart_printf(" [Buffer Overflow!] ");
+                break; 
+            }
+            
+            // Re-read STATUS0 to check for RX_EMPTY 
+            if (i2c_read_multi(FUSB302_REG_STATUS0, &status0, 1) != 0) { break; }
+            
+        } while (!(status0 & (1 << 6))); // Loop while RX_EMPTY is not set
+        
+        uart_printf("\nTotal Bytes Read: %d\n", byte_count);
+    }
+}
+
+
+// --- Peripheral Setup ---
 
 static void clock_setup(void) {
     rcc_clock_setup_in_hsi_out_48mhz();
@@ -43,164 +244,35 @@ static void i2c_setup(void) {
     i2c_peripheral_enable(I2C1);
 }
 
-/* simple blocking getchar/putchar */
-int _write(int fd, char *ptr, int len) {
-    (void)fd;
-    for (int i=0; i<len; i++) usart_send_blocking(USART2, ptr[i]);
-    return len;
-}
-
-static char usart_getc(void) { 
-    return usart_recv_blocking(USART2); 
-}
-
-/* I2C helpers */
-/*
-void i2c_transfer7(uint32_t i2c, uint8_t addr, const uint8_t *w, size_t wn, uint8_t *r, size_t rn);
-    i2c: The base address of the I2C peripheral
-    addr: The 7-bit I2C slave address
-    w: A pointer to the data buffer to be written to the slave
-    wn: The number of bytes to write
-    r: A pointer to the buffer where the data read from the slave will be stored
-    rn: The number of bytes to read from the slave
-*/
-
-static void fusb_read_reg(uint32_t i2c, uint8_t reg, uint8_t *val) {
-    i2c_transfer7(i2c, FUSB302_ADDR, &reg, 1, val, 1);
-}
-static void fusb_write_reg(uint32_t i2c, uint8_t reg, uint8_t val) {
-    uint8_t buf[2] = {reg, val};
-    i2c_transfer7(i2c, FUSB302_ADDR, buf, 2, NULL, 0);
-}
-
-static void fusb_read_reg_nbytes(uint32_t i2c, uint8_t reg, uint8_t *buf, size_t nbytes) {
-    i2c_transfer7(i2c, FUSB302_ADDR, &reg, 1, buf, nbytes);
-}
-
-static void fusb_write_reg_nbytes(uint32_t i2c, uint8_t reg, const uint8_t *buf, size_t nbytes) {
-    uint8_t wbuf_size = 1 + nbytes;
-    uint8_t *wbuf = malloc(wbuf_size);
-    wbuf[0] = reg;
-    memcpy(&wbuf[1], buf, nbytes);
-    i2c_transfer7(i2c, FUSB302_ADDR, wbuf, 1 + nbytes, NULL, 0);
-}
-
-/* low level i2c scan */
-static bool i2c_probe_addr(uint32_t i2c, uint8_t addr) {
-
-    /* clear flags */
-    I2C_ICR(i2c) = I2C_ICR_NACKCF | I2C_ICR_STOPCF;
-
-    /* send address */
-    I2C_CR2(i2c) =
-        (addr << 1) |      // address in bits 7:1
-        (0 << 16)  |       // number of bytes
-        I2C_CR2_START;     // generate START
-
-    /* wait for either ACK or NACK */
-    while (1) {
-        uint32_t isr = I2C_ISR(i2c);
-
-        if (isr & I2C_ISR_NACKF) {
-            I2C_ICR(i2c) = I2C_ICR_STOPCF | I2C_ICR_NACKCF;
-            return false;  // NACK means no device
-        }
-
-        if (isr & I2C_ISR_STOPF) {
-            I2C_ICR(i2c) = I2C_ICR_STOPCF;
-            return true;   // STOP with no NACK means device responded
-        }
-    }
-}
-
-void fusb_delay_ms(uint32_t ms) {
-    for (volatile uint32_t i=0; i<ms*4800; i++);
-}
-
-void fusb_reset(uint32_t i2c) {
-    fusb_write_reg(i2c, FUSB302_REG_RESET, FUSB302_RESET_SW);
-    fusb_delay_ms(1);
-}
-
-void fusb_pd_reset(uint32_t i2c) {
-    fusb_write_reg(i2c, FUSB302_REG_RESET, FUSB302_RESET_PD);
-    fusb_delay_ms(1);
-}
-
-void fusb_wake_from_sleep(uint32_t i2c) {
-    fusb_write_reg(i2c, FUSB302_REG_POWER, 0x0F);
-    fusb_delay_ms(1);
-}
-
-/* CLI parser */
-static void handle_command(char *line) {
-    if (line[0] == 'r') {
-        uint8_t reg = (uint8_t)strtol(&line[1], NULL, 0);
-        uint8_t val;
-        fusb_read_reg(I2C1, reg, &val);
-        printf("read[0x%02X] = 0x%02X\r\n", reg, val);
-    } else if (line[0] == 'w') {
-        char *p = strtok(&line[1], " ");
-        if (!p) { printf("usage: w <reg> <val>\r\n"); return; }
-        uint8_t reg = (uint8_t)strtol(p, NULL, 0);
-        p = strtok(NULL, " ");
-        if (!p) { printf("usage: w <reg> <val>\r\n"); return; }
-        uint8_t val = (uint8_t)strtol(p, NULL, 0);
-        fusb_write_reg(I2C1, reg, val);
-        printf("write[0x%02X] = 0x%02X\r\n", reg, val);
-    } else if (line[0] == 's') {
-        printf("Scanning I2C...\r\n");
-        for (uint8_t addr=1; addr<0x7F; addr++) {
-            if (i2c_probe_addr(I2C1, addr)) {
-                printf("Probed 0x%02X\r\n", addr);
-            }
-        }
-    } else if (line[0] == 'b') {
-        char *p = strtok(&line[1], " ");
-        if (!p) { printf("bulk read usage: b <reg>\r\n"); return; }
-        uint8_t reg = (uint8_t)strtol(p, NULL, 0);
-        size_t nbytes = 80;
-        uint8_t buf[80]; 
-        fusb_read_reg_nbytes(I2C1, reg, buf, nbytes);
-        printf("read[0x%02X] = ", reg);
-        for (int i=0; i<80; i++) {
-            printf("0x%02X ", buf[i]);
-        }
-        printf("\r\n");
-    } else if (line[0] == 'n') {
-        char *p = strtok(&line[1], " ");
-        if (!p) { printf("bulk write usage: n <reg> <val1> <val2> ...\r\n"); return; }
-        uint8_t reg = (uint8_t)strtol(p, NULL, 0);
-        uint8_t buf[40];
-        size_t nbytes = 0;
-        while ((p = strtok(NULL, " ")) != NULL && nbytes < sizeof(buf)) {
-            buf[nbytes++] = (uint8_t)strtol(p, NULL, 0);
-        }
-        fusb_write_reg_nbytes(I2C1, reg, buf, nbytes);
-        printf("bulk wrote %u bytes to reg 0x%02X\r\n", (unsigned)nbytes, reg);
-    } else {
-        printf("Commands:\r\n  r <reg>\r\n  w <reg> <val>\r\n  s (scan)\r\n  b <reg>\r\n  n <reg> <val1> <val2> ...\r\n");
-    }
-}
+// --- Main Program ---
 
 int main(void) {
+    
+    // Setup Peripherals
     clock_setup();
     usart_setup();
     i2c_setup();
-    printf("\r\nFUSB302 I2C test\r\n> ");
+    
+    // Initial delay for serial connection
+    for(int i = 0; i < 800000; i++) { __asm__("nop"); }
 
-    char line[32]; int pos=0;
-    while (1) {
-        char c = usart_getc();
-        if (c=='\r' || c=='\n') {
-            line[pos]=0;
-            printf("\r\n");
-            handle_command(line);
-            pos=0;
-            printf("> ");
-        } else if (pos < (int)sizeof(line)-1) {
-            usart_send_blocking(USART2, c); /* echo */
-            line[pos++]=c;
-        }
+    uart_printf("\n--- FUSB302 PD Message Sniffer Started (UART) ---\n");
+    uart_printf("Connect a PD Source/Sink to the USB-C receptacle.\n");
+    uart_printf("I2C Address: 0x%02X\n", FUSB302_I2C_ADDR);
+    
+    // Configure FUSB302 for Sniffing
+    if (fusb302_sniffer_setup() != 0) {
+        uart_printf("FATAL: FUSB302 setup failed. Check I2C connection.\n");
+        while(1); // Stop execution
     }
+
+    // A sniffer passively monitors the two CC lines for traffic. 
+
+    while (1) {
+        // Continuously check the FUSB302 for captured messages
+        check_and_read_fifo();
+    }
+    
+    return 0;
 }
+
