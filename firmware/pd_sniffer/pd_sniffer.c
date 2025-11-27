@@ -15,6 +15,14 @@
 
 // --- UART Console Functions ---
 
+
+/* simple blocking getchar/putchar */
+int _write(int fd, char *ptr, int len) {
+    (void)fd;
+    for (int i=0; i<len; i++) usart_send_blocking(USART2, ptr[i]);
+    return len;
+}
+
 /**
  * @brief Sends a single character over USART2 (blocking).
  */
@@ -59,9 +67,9 @@ static int i2c_write_byte(uint8_t reg_addr, uint8_t data) {
     for (int i = 0; i < 2; i++) {
         uint32_t timeout = 0x10000;
         while (!((I2C_ISR(I2C1) & I2C_ISR_TXIS) || (I2C_ISR(I2C1) & I2C_ISR_NACKF)) && timeout) { timeout--; }
-        if (I2C_ISR(I2C1) & I2C_ISR_NACKF) { i2c_clear_nack(I2C1); i2c_send_stop(I2C1); return -1; }
+        if (I2C_ISR(I2C1) & I2C_ISR_NACKF) { i2c_clear_stop(I2C1); i2c_send_stop(I2C1); return -1; }
         if (timeout == 0) { return -1; }
-        i2c_send_byte(I2C1, buffer[i]);
+        i2c_send_data(I2C1, buffer[i]);
     }
     
     uint32_t timeout = 0x10000;
@@ -69,13 +77,14 @@ static int i2c_write_byte(uint8_t reg_addr, uint8_t data) {
     i2c_clear_stop(I2C1);
     
     if (I2C_ISR(I2C1) & I2C_ISR_NACKF) {
-        i2c_clear_nack(I2C1);
+        i2c_clear_stop(I2C1);
         uart_printf("I2C NACK on write.\n");
         return -1;
     }
     
     return 0;
 }
+
 
 /**
  * @brief Performs an I2C multi-byte read transaction (RegAddr write + read N bytes).
@@ -91,8 +100,8 @@ static int i2c_read_multi(uint8_t reg_addr, uint8_t *data, uint8_t len) {
     
     uint32_t timeout = 0x10000;
     while (!((I2C_ISR(I2C1) & I2C_ISR_TXIS) || (I2C_ISR(I2C1) & I2C_ISR_NACKF)) && timeout) { timeout--; }
-    if (I2C_ISR(I2C1) & I2C_ISR_NACKF) { i2c_clear_nack(I2C1); i2c_send_stop(I2C1); return -1; }
-    i2c_send_byte(I2C1, reg_addr);
+    if (I2C_ISR(I2C1) & I2C_ISR_NACKF) { i2c_clear_stop(I2C1); i2c_send_stop(I2C1); return -1; }
+    i2c_send_data(I2C1, reg_addr);
     
     timeout = 0x10000;
     while (!(I2C_ISR(I2C1) & I2C_ISR_TC) && timeout) { timeout--; }
@@ -108,7 +117,7 @@ static int i2c_read_multi(uint8_t reg_addr, uint8_t *data, uint8_t len) {
         timeout = 0x10000;
         while (!(I2C_ISR(I2C1) & I2C_ISR_RXNE) && timeout) { timeout--; }
         if (timeout == 0) { uart_printf("I2C Read Timeout.\n"); i2c_send_stop(I2C1); return -1; }
-        data[i] = i2c_get_received_byte(I2C1);
+        data[i] = i2c_received_data(I2C1);
     }
     
     // Wait for STOPF (transfer complete)
