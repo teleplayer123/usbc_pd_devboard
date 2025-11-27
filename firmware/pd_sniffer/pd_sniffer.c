@@ -49,6 +49,10 @@ static void uart_printf(const char *format, ...) {
     }
 }
 
+static char usart_getc(void) { 
+    return usart_recv_blocking(USART2); 
+}
+
 
 // --- I2C Communication Functions ---
 
@@ -136,13 +140,13 @@ static int fusb302_sniffer_setup(void) {
     
     uart_printf("Initializing FUSB302 for PD Sniffing...\n");
     
-    // 1. Soft Reset: Reset ALL (masking, PD state, switches, etc)
-    if (i2c_write_byte(FUSB302_REG_RESET, 0x07) != 0) {
+    // Reset ALL (masking, PD state, switches, etc)
+    if (i2c_write_byte(FUSB302_REG_RESET, 0x00) != 0) {
         uart_printf("FUSB302 Error: Failed to write RESET register.\n");
         return -1;
     }
     
-    // 2. Configure Switches for Passive Sniffing
+    // Configure Switches for Passive Sniffing
     // SWITCHES0 (0x02): All off. (CC1_PU/PD, CC2_PU/PD, VBUS, etc.)
     if (i2c_write_byte(FUSB302_REG_SWITCHES0, 0x00) != 0) { result = -2; goto error_exit; }
 
@@ -150,7 +154,7 @@ static int fusb302_sniffer_setup(void) {
     // RX_CC1 (bit 0) | RX_CC2 (bit 1) = 0x03
     if (i2c_write_byte(FUSB302_REG_SWITCHES1, 0x03) != 0) { result = -3; goto error_exit; }
     
-    // 3. Configure Control Registers
+    // Configure Control Registers
     // CONTROL1 (0x0D): Clear RX_FLUSH (bit 6) to prepare FIFO for new messages.
     if (i2c_write_byte(FUSB302_REG_CONTROL1, 0x00) != 0) { result = -4; goto error_exit; }
     
@@ -172,15 +176,15 @@ error_exit:
 static void check_and_read_fifo(void) {
     uint8_t status0;
     
-    // 1. Read STATUS0 (0x40) to check RX_FULL bit (bit 5) and RX_EMPTY bit (bit 6)
-    // We read STATUS0 multiple times to check the RX_EMPTY state correctly.
-    if (i2c_read_multi(FUSB302_REG_STATUS0, &status0, 1) != 0) {
+    // 1. Read STATUS1 (0x41) to check RX_FULL bit (bit 4) and RX_EMPTY bit (bit 5)
+    // We read STATUS1 multiple times to check the RX_EMPTY state correctly.
+    if (i2c_read_multi(FUSB302_REG_STATUS1, &status0, 1) != 0) {
         uart_printf("Error: Cannot read STATUS0.\n");
         return;
     }
 
     // Check if the RX_FULL flag is set (PD message received)
-    if (status0 & (1 << 5)) {
+    if (status0 & FUSB302_STATUS1_RX_FULL) {
         
         uint8_t rx_data_buffer[80]; 
         uint8_t byte_count = 0;
@@ -207,7 +211,7 @@ static void check_and_read_fifo(void) {
             // Re-read STATUS0 to check for RX_EMPTY 
             if (i2c_read_multi(FUSB302_REG_STATUS0, &status0, 1) != 0) { break; }
             
-        } while (!(status0 & (1 << 6))); // Loop while RX_EMPTY is not set
+        } while (!(status0 & FUSB302_STATUS1_RX_EMPTY)); // Loop while RX_EMPTY is not set
         
         uart_printf("\nTotal Bytes Read: %d\n", byte_count);
     }
@@ -260,8 +264,7 @@ int main(void) {
     usart_setup();
     i2c_setup();
     
-    // Initial delay for serial connection
-    for(int i = 0; i < 800000; i++) { __asm__("nop"); }
+    usart_getc(); // Dummy read to initialize USART
 
     uart_printf("\n--- FUSB302 PD Message Sniffer Started (UART) ---\n");
     uart_printf("Connect a PD Source/Sink to the USB-C receptacle.\n");
