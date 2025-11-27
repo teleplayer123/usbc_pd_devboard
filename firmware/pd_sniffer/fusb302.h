@@ -111,7 +111,7 @@
 #define FUSB302_CTL2_MODE_DRP       (2 << FUSB302_CTL2_MODE_POS)
 
 /* -----------------------------------------------------------
- * CONTROL3 (0x09)  — CORRECTED: hard reset = bit 6
+ * CONTROL3 (0x09)
  * ----------------------------------------------------------- */
 #define FUSB302_CTL3_SEND_HARD_RESET (1 << 6)
 #define FUSB302_CTL3_BIST_TMODE     (1 << 5)
