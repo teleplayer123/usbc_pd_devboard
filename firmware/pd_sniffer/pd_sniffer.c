@@ -65,19 +65,16 @@ void i2c_transfer7(uint32_t i2c, uint8_t addr, const uint8_t *w, size_t wn, uint
     rn: The number of bytes to read from the slave
 */
 
-static int fusb_read_reg(uint32_t i2c, uint8_t reg, uint8_t *val) {
+static void fusb_read_reg(uint32_t i2c, uint8_t reg, uint8_t *val) {
     i2c_transfer7(i2c, FUSB302_ADDR, &reg, 1, val, 1);
-    return 0;
 }
-static int fusb_write_reg(uint32_t i2c, uint8_t reg, uint8_t val) {
+static void fusb_write_reg(uint32_t i2c, uint8_t reg, uint8_t val) {
     uint8_t buf[2] = {reg, val};
     i2c_transfer7(i2c, FUSB302_ADDR, buf, 2, NULL, 0);
-    return 0;
 }
 
-static int fusb_read_reg_nbytes(uint32_t i2c, uint8_t reg, uint8_t *buf, size_t nbytes) {
+static void fusb_read_reg_nbytes(uint32_t i2c, uint8_t reg, uint8_t *buf, size_t nbytes) {
     i2c_transfer7(i2c, FUSB302_ADDR, &reg, 1, buf, nbytes);
-    return 0;
 }
 
 static void fusb_write_reg_nbytes(uint32_t i2c, uint8_t reg, const uint8_t *buf, size_t nbytes) {
@@ -116,10 +113,23 @@ static bool i2c_probe_addr(uint32_t i2c, uint8_t addr) {
     }
 }
 
+void fusb_delay_ms(uint32_t ms) {
+    for (volatile uint32_t i=0; i<ms*4800; i++);
+}
+
 void fusb_reset(uint32_t i2c) {
-    fusb_write_reg(i2c, FUSB302_REG_RESET, FUSB302_);
-    /* wait a bit for reset to complete */
-    for (volatile int i=0; i<100000; i++);
+    fusb_write_reg(i2c, FUSB302_REG_RESET, FUSB302_RESET_SW);
+    fusb_delay_ms(1);
+}
+
+void fusb_pd_reset(uint32_t i2c) {
+    fusb_write_reg(i2c, FUSB302_REG_RESET, FUSB302_RESET_PD);
+    fusb_delay_ms(1);
+}
+
+void fusb_wake_from_sleep(uint32_t i2c) {
+    fusb_write_reg(i2c, FUSB302_REG_POWER, 0x0F);
+    fusb_delay_ms(1);
 }
 
 /* CLI parser */
