@@ -9,8 +9,6 @@
 #include <libopencm3/stm32/i2c.h>
 #include <libopencm3/stm32/usart.h>
 #include <libopencm3/cm3/nvic.h>
-
-#include <string.h>
 #include <stdio.h>
 #include <stdarg.h>
 #include "fusb302.h"
@@ -52,7 +50,7 @@ static void uart_printf(const char *format, ...) {
 static int i2c_write_byte(uint8_t reg_addr, uint8_t data) {
     uint8_t buffer[2] = {reg_addr, data};
     
-    i2c_set_7bit_address(I2C1, FUSB302_I2C_ADDR);
+    i2c_set_7bit_address(I2C1, FUSB302_ADDR);
     i2c_set_bytes_to_transfer(I2C1, 2);
     i2c_set_write_transfer_dir(I2C1);
     i2c_enable_autoend(I2C1);
@@ -85,7 +83,7 @@ static int i2c_write_byte(uint8_t reg_addr, uint8_t data) {
  */
 static int i2c_read_multi(uint8_t reg_addr, uint8_t *data, uint8_t len) {
     // 1. Write Register Address (Setup Phase)
-    i2c_set_7bit_address(I2C1, FUSB302_I2C_ADDR);
+    i2c_set_7bit_address(I2C1, FUSB302_ADDR);
     i2c_set_bytes_to_transfer(I2C1, 1);
     i2c_set_write_transfer_dir(I2C1);
     i2c_disable_autoend(I2C1); 
@@ -100,7 +98,7 @@ static int i2c_read_multi(uint8_t reg_addr, uint8_t *data, uint8_t len) {
     while (!(I2C_ISR(I2C1) & I2C_ISR_TC) && timeout) { timeout--; }
 
     // 2. Read Data (Repeated Start Phase)
-    i2c_set_7bit_address(I2C1, FUSB302_I2C_ADDR);
+    i2c_set_7bit_address(I2C1, FUSB302_ADDR);
     i2c_set_bytes_to_transfer(I2C1, len);
     i2c_set_read_transfer_dir(I2C1);
     i2c_enable_autoend(I2C1); 
@@ -258,7 +256,7 @@ int main(void) {
 
     uart_printf("\n--- FUSB302 PD Message Sniffer Started (UART) ---\n");
     uart_printf("Connect a PD Source/Sink to the USB-C receptacle.\n");
-    uart_printf("I2C Address: 0x%02X\n", FUSB302_I2C_ADDR);
+    uart_printf("I2C Address: 0x%02X\n", FUSB302_ADDR);
     
     // Configure FUSB302 for Sniffing
     if (fusb302_sniffer_setup() != 0) {
