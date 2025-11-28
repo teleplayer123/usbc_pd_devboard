@@ -11,6 +11,8 @@
 #include <libopencm3/cm3/nvic.h>
 #include <stdio.h>
 #include <stdarg.h>
+#include <string.h>
+#include <stdlib.h>
 #include "fusb302.h"
 
 // --- UART Console Functions ---
@@ -51,6 +53,16 @@ static void uart_printf(const char *format, ...) {
 
 static char usart_getc(void) { 
     return usart_recv_blocking(USART2); 
+}
+
+static void uart_hexdump(const uint8_t *data, size_t len) {
+    for (size_t i = 0; i < len; i++) {
+        uart_printf("%02X ", data[i]);
+        if ((i + 1) % 16 == 0) {
+            uart_printf("\n");
+        }
+    }
+    uart_printf("\n");
 }
 
 
@@ -132,8 +144,30 @@ static int i2c_read_multi(uint8_t reg_addr, uint8_t *data, uint8_t len) {
     return 0;
 }
 
-static void i2c_read_reg(uint8_t reg, uint8_t *val) {
-    i2c_transfer7(I2C1, FUSB302_ADDR, &reg, 1, val, 1);
+static uint8_t i2c_read_reg(uint8_t reg) {
+    uint8_t val;
+    i2c_transfer7(I2C1, FUSB302_ADDR, &reg, 1, &val, 1);
+    return val;
+}
+
+static void i2c_write_reg(uint8_t reg, uint8_t val) {
+    uint8_t buf[2] = {reg, val};
+    i2c_transfer7(I2C1, FUSB302_ADDR, buf, 2, NULL, 0);
+}
+
+static uint8_t *i2c_read_reg_fifo(uint8_t reg) {
+    static uint8_t buf[80];
+    size_t nbytes = 80;
+    i2c_transfer7(I2C1, FUSB302_ADDR, &reg, 1, buf, nbytes);
+    return buf;
+}
+
+static void i2c_write_reg_nbytes(uint8_t reg, const uint8_t *buf, size_t nbytes) {
+    uint8_t wbuf_size = 1 + nbytes;
+    uint8_t *wbuf = malloc(wbuf_size);
+    wbuf[0] = reg;
+    memcpy(&wbuf[1], buf, nbytes);
+    i2c_transfer7(I2C1, FUSB302_ADDR, wbuf, 1 + nbytes, NULL, 0);
 }
 
 // --- FUSB302 PD Sniffer Configuration and Monitoring ---
@@ -178,8 +212,7 @@ static int fusb302_sniffer_setup(void) {
     if (i2c_write_byte(FUSB302_REG_SWITCHES1, 0x20) != 0) { result = -3; goto error_exit; }
 
     // CONTROL0: clear INT_MASK in CONTROL0 (read-modify-write)
-    uint8_t c0;
-    i2c_read_reg(FUSB302_REG_CONTROL0, &c0);
+    uint8_t c0 = i2c_read_reg(FUSB302_REG_CONTROL0);
     c0 &= ~FUSB302_CTL0_INT_MASK;
     if (i2c_write_byte(FUSB302_REG_CONTROL0, c0) != 0) { result = -4; goto error_exit; }
     
@@ -204,46 +237,29 @@ error_exit:
  * @brief Checks FUSB302 status and reads any captured PD messages from the FIFO.
  */
 static void check_and_read_fifo(void) {
-    uint8_t status0;
     uart_printf("Checking for PD messages...\n");
-    
+
     // Read STATUS1 (0x41) to check RX_FULL bit (bit 4) and RX_EMPTY bit (bit 5)
-    if (i2c_read_multi(FUSB302_REG_STATUS1, &status0, 1) != 0) {
-        uart_printf("Error: Cannot read STATUS0.\n");
-        return;
-    }
+    uint8_t status0 = i2c_read_reg(FUSB302_REG_STATUS1);
+    uart_printf("FUSB302 STATUS1: 0x%02X\n", status0);
 
     // Check if the RX_FULL flag is set (PD message received)
     if (status0 & FUSB302_STATUS1_RX_FULL) {
-        
-        uint8_t rx_data_buffer[80]; 
-        uint8_t byte_count = 0;
-        
         uart_printf("\n--- PD Message Captured ---\n");
         uart_printf("Raw FIFO Bytes (HEX): ");
 
         // Read all available bytes until RX_EMPTY is set.
-        while (!(status0 & FUSB302_STATUS1_RX_EMPTY)) {
-            uint8_t fifo_byte;
-            // Read one byte from the FIFO register
-            if (i2c_read_multi(FUSB302_REG_FIFOS, &fifo_byte, 1) != 0) {
-                 uart_printf(" (FIFO Read Fail) ");
-                 break;
-            }
-            rx_data_buffer[byte_count++] = fifo_byte;
-            uart_printf("%02X ", fifo_byte);
-            
-            if (byte_count > 80) { 
-                uart_printf(" [Buffer Overflow!] ");
-                break; 
-            }
-            
+        while (1) {
+            uint8_t *buf = i2c_read_reg_fifo(FUSB302_REG_FIFOS);
+            uart_hexdump(buf, 80);
+
             // Re-read STATUS0 to check for RX_EMPTY 
-            if (i2c_read_multi(FUSB302_REG_STATUS0, &status0, 1) != 0) { break; }
-            
+            if (i2c_read_reg(FUSB302_REG_STATUS1) & FUSB302_STATUS1_RX_EMPTY) {
+                uart_printf("Error reading STATUS1 during FIFO read.\n");
+                break;
+            }
         }
-        
-        uart_printf("\nTotal Bytes Read: %d\n", byte_count);
+        uart_printf("--- End of PD Message ---\n");
     }
 }
 
