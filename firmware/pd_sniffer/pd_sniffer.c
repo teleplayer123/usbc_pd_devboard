@@ -139,28 +139,52 @@ static int fusb302_sniffer_setup(void) {
     int result;
     
     uart_printf("Initializing FUSB302 for PD Sniffing...\n");
-    
-    // Reset ALL (masking, PD state, switches, etc)
-    if (i2c_write_byte(FUSB302_REG_RESET, FUSB302_POWER_BANDGAP | FUSB302_POWER_RX_REF | FUSB302_POWER_MEAS_BLOCK) != 0) {
+
+    // Reset the FUSB302
+    if (i2c_write_byte(FUSB302_REG_RESET, FUSB302_RESET_SW) != 0) {
         uart_printf("FUSB302 Error: Failed to write RESET register.\n");
         return -1;
     }
     
-    // Configure Switches for Passive Sniffing
-    // SWITCHES0 (0x02): All off. (CC1_PU/PD, CC2_PU/PD, VBUS, etc.)
-    if (i2c_write_byte(FUSB302_REG_SWITCHES0, 0x00) != 0) { result = -2; goto error_exit; }
+    // Turn on reference, receiver, measure block, and oscillator
+    if (i2c_write_byte(FUSB302_REG_POWER, FUSB302_POWER_BANDGAP | FUSB302_POWER_RX_REF | FUSB302_POWER_MEAS_BLOCK) != 0) {
+        uart_printf("FUSB302 Error: Failed to write RESET register.\n");
+        return -1;
+    }
+    
+    // Unmask interupts
+    if (i2c_write_byte(FUSB302_REG_MASKA, 0x00) != 0) {
+        uart_printf("FUSB302 Error: Failed to unmask INTERRUPTA.\n");
+        return -1;
+    }
 
-    // SWITCHES1 (0x03): Set to monitor CC1 AND CC2 for reception.
-    // RX_CC1 (bit 0) | RX_CC2 (bit 1) = 0x03
+    if (i2c_write_byte(FUSB302_REG_MASKB, 0x00) != 0) {
+        uart_printf("FUSB302 Error: Failed to unmask INTERRUPTB.\n");
+        return -1;
+    }
+
+    if (i2c_write_byte(FUSB302_REG_MASK, 0x00) != 0) {
+        uart_printf("FUSB302 Error: Failed to unmask INTERRUPT.\n");
+        return -1;
+    }
+
+    // SWITCHES0: Enable pull-downs
+    if (i2c_write_byte(FUSB302_REG_SWITCHES0, FUSB302_SW0_PDWN1 | FUSB302_SW0_PDWN2) != 0) { result = -2; goto error_exit; }
+
+    // SWITCHES1: All off
     if (i2c_write_byte(FUSB302_REG_SWITCHES1, 0x03) != 0) { result = -3; goto error_exit; }
+
+    // CONTROL0: Disable TX
+    if (i2c_write_byte(FUSB302_REG_CONTROL0, 0x00) != 0) { result = -4; goto error_exit; }
     
-    // Configure Control Registers
-    // CONTROL1 (0x0D): Clear RX_FLUSH (bit 6) to prepare FIFO for new messages.
-    if (i2c_write_byte(FUSB302_REG_CONTROL1, 0x00) != 0) { result = -4; goto error_exit; }
+    // CONTROL1: Enable SOP/SOP′/SOP″ decoding
+    if (i2c_write_byte(FUSB302_REG_CONTROL1, FUSB302_CTL1_ENSOP1 | FUSB302_CTL1_ENSOP2 | FUSB302_CTL1_ENSOP1DB | FUSB302_CTL1_ENSOP2DB) != 0) { result = -5; goto error_exit; }
     
-    // CONTROL2 (0x0E): Set Mode to PD Monitoring (MODE[1:0] = 10b). 
-    // This enables the PD core into a listening state (0x02 << 4) = 0x20.
-    if (i2c_write_byte(FUSB302_REG_CONTROL2, 0x20) != 0) { result = -5; goto error_exit; }
+    // CONTROL2: Enable RX receiver and BMC decoding
+    if (i2c_write_byte(FUSB302_REG_CONTROL2, 0x00) != 0) { result = -6; goto error_exit; }
+
+    // CONTROL3: Disable automatic GoodCRC / hard reset
+    if (i2c_write_byte(FUSB302_REG_CONTROL3, 0x00) != 0) { result = -7; goto error_exit; }
     
     uart_printf("FUSB302 Sniffer is configured and listening.\n");
     return 0;

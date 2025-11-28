@@ -132,6 +132,26 @@ void fusb_wake_from_sleep(uint32_t i2c) {
     fusb_delay_ms(1);
 }
 
+void fusb_setup_sniffer(uint32_t i2c) {
+    fusb_write_reg(i2c, FUSB302_REG_SWITCHES0,
+        FUSB302_SW0_PU_EN2 |
+        FUSB302_SW0_MEAS_CC1);
+    fusb_write_reg(i2c, FUSB302_REG_SWITCHES1,
+        FUSB302_SW1_POWERROLE |   // source
+        FUSB302_SW1_SPECREV1 |    // spec rev 2.0
+        FUSB302_SW1_DATAROLE |    // DFP
+        FUSB302_SW1_AUTO_CRC);    // auto CRC
+
+    fusb_write_reg(i2c, FUSB302_REG_CONTROL3,
+        0x00);                    // sniffer mode
+
+    fusb_write_reg(i2c, FUSB302_REG_MASKA,
+        0x00);                    // unmask all interrupts
+
+    fusb_write_reg(i2c, FUSB302_REG_MASKB,
+        0x00);                    // unmask all interrupts
+}
+
 /* CLI parser */
 static void handle_command(char *line) {
     if (line[0] == 'r') {
