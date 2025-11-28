@@ -141,7 +141,7 @@ static int fusb302_sniffer_setup(void) {
     uart_printf("Initializing FUSB302 for PD Sniffing...\n");
     
     // Reset ALL (masking, PD state, switches, etc)
-    if (i2c_write_byte(FUSB302_REG_RESET, 0x00) != 0) {
+    if (i2c_write_byte(FUSB302_REG_RESET, FUSB302_POWER_BANDGAP | FUSB302_POWER_RX_REF | FUSB302_POWER_MEAS_BLOCK) != 0) {
         uart_printf("FUSB302 Error: Failed to write RESET register.\n");
         return -1;
     }
