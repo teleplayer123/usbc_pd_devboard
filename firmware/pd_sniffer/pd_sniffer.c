@@ -205,9 +205,9 @@ error_exit:
  */
 static void check_and_read_fifo(void) {
     uint8_t status0;
+    uart_printf("Checking for PD messages...\n");
     
-    // 1. Read STATUS1 (0x41) to check RX_FULL bit (bit 4) and RX_EMPTY bit (bit 5)
-    // We read STATUS1 multiple times to check the RX_EMPTY state correctly.
+    // Read STATUS1 (0x41) to check RX_FULL bit (bit 4) and RX_EMPTY bit (bit 5)
     if (i2c_read_multi(FUSB302_REG_STATUS1, &status0, 1) != 0) {
         uart_printf("Error: Cannot read STATUS0.\n");
         return;
@@ -223,9 +223,9 @@ static void check_and_read_fifo(void) {
         uart_printf("Raw FIFO Bytes (HEX): ");
 
         // Read all available bytes until RX_EMPTY is set.
-        do {
+        while (!(status0 & FUSB302_STATUS1_RX_EMPTY)) {
             uint8_t fifo_byte;
-            // Read one byte from the FIFO register (0x44)
+            // Read one byte from the FIFO register
             if (i2c_read_multi(FUSB302_REG_FIFOS, &fifo_byte, 1) != 0) {
                  uart_printf(" (FIFO Read Fail) ");
                  break;
@@ -241,7 +241,7 @@ static void check_and_read_fifo(void) {
             // Re-read STATUS0 to check for RX_EMPTY 
             if (i2c_read_multi(FUSB302_REG_STATUS0, &status0, 1) != 0) { break; }
             
-        } while (!(status0 & FUSB302_STATUS1_RX_EMPTY)); // Loop while RX_EMPTY is not set
+        }
         
         uart_printf("\nTotal Bytes Read: %d\n", byte_count);
     }
