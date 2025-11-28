@@ -193,20 +193,17 @@ static int fusb302_sniffer_setup(void) {
     // Power on
     res = i2c_write_read_reg(FUSB302_REG_POWER, FUSB302_POWER_ALL_ON);
     uart_printf("FUSB302 POWER reg: 0x%02X\n", res);
-    fusb_delay_ms(10);
 
     // Enable pull-ups on CC1 and CC2, set default USB current (80µA)
     // Switches0: PU_EN2=1, PU_EN1=1, PDWN2=1, PDWN1=1
     // This enables detection on both CC lines
     res = i2c_write_read_reg(FUSB302_REG_SWITCHES0, FUSB302_SW0_PU_EN2 | FUSB302_SW0_PU_EN1 | FUSB302_SW0_PDWN2 | FUSB302_SW0_PDWN1);
     uart_printf("FUSB302 SWITCHES0 reg: 0x%02X\n", res);
-    fusb_delay_ms(10);
 
     // Set host current advertisement to default USB (80µA)
     // Control0: HOST_CUR[1:0] = 01 (default current)
     res = i2c_write_read_reg(FUSB302_REG_CONTROL0, (1 << FUSB302_CTL0_HOST_CUR_POS));
     uart_printf("FUSB302 CONTROL0 reg: 0x%02X\n", res);
-    fusb_delay_ms(10);
 
     return 0;
 }
