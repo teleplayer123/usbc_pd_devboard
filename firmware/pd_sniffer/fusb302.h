@@ -140,6 +140,7 @@
 #define FUSB302_POWER_RX_REF        (1 << 1)
 #define FUSB302_POWER_MEAS_BLOCK    (1 << 2)
 #define FUSB302_POWER_INTERNAL_OSC  (1 << 3)
+#define FUSB302_POWER_ALL_ON        (FUSB302_POWER_BANDGAP | FUSB302_POWER_RX_REF | FUSB302_POWER_MEAS_BLOCK | FUSB302_POWER_INTERNAL_OSC)
 
 /* -----------------------------------------------------------
  * RESET (0x0C)

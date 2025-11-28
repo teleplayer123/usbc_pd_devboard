@@ -17,7 +17,6 @@
 
 // --- UART Console Functions ---
 
-
 /* simple blocking getchar/putchar */
 int _write(int fd, char *ptr, int len) {
     (void)fd;
@@ -65,6 +64,9 @@ static void uart_hexdump(const uint8_t *data, size_t len) {
     uart_printf("\n");
 }
 
+void fusb_delay_ms(uint32_t ms) {
+    for (volatile uint32_t i=0; i<ms*4800; i++);
+}
 
 // --- I2C Communication Functions ---
 
@@ -100,7 +102,6 @@ static int i2c_write_byte(uint8_t reg_addr, uint8_t data) {
     
     return 0;
 }
-
 
 /**
  * @brief Performs an I2C multi-byte read transaction (RegAddr write + read N bytes).
@@ -170,67 +171,44 @@ static void i2c_write_reg_nbytes(uint8_t reg, const uint8_t *buf, size_t nbytes)
     i2c_transfer7(I2C1, FUSB302_ADDR, wbuf, 1 + nbytes, NULL, 0);
 }
 
+static uint8_t i2c_write_read_reg(uint8_t reg, uint8_t val) {
+    uint8_t wbuf[2] = {reg, val};
+    i2c_write_reg(reg, val);
+    uint8_t rval = i2c_read_reg(reg);
+    return rval;
+}
+
 // --- FUSB302 PD Sniffer Configuration and Monitoring ---
 
 static int fusb302_sniffer_setup(void) {
-    int result;
+    uint8_t res;
     
     uart_printf("Initializing FUSB302 for PD Sniffing...\n");
-
+    
     // Reset the FUSB302
-    if (i2c_write_byte(FUSB302_REG_RESET, FUSB302_RESET_SW) != 0) {
-        uart_printf("FUSB302 Error: Failed to write RESET register.\n");
-        return -1;
-    }
-    
-    // Turn on reference, receiver, measure block, and oscillator
-    if (i2c_write_byte(FUSB302_REG_POWER, FUSB302_POWER_BANDGAP | FUSB302_POWER_RX_REF | FUSB302_POWER_MEAS_BLOCK) != 0) {
-        uart_printf("FUSB302 Error: Failed to write RESET register.\n");
-        return -1;
-    }
-    
-    // Unmask interupts
-    if (i2c_write_byte(FUSB302_REG_MASKA, 0x00) != 0) {
-        uart_printf("FUSB302 Error: Failed to unmask INTERRUPTA.\n");
-        return -1;
-    }
+    res = i2c_write_read_reg(FUSB302_REG_RESET, FUSB302_RESET_SW);
+    uart_printf("FUSB302 RESET reg: 0x%02X\n", res);
+    fusb_delay_ms(10);
 
-    if (i2c_write_byte(FUSB302_REG_MASKB, 0x00) != 0) {
-        uart_printf("FUSB302 Error: Failed to unmask INTERRUPTB.\n");
-        return -1;
-    }
+    // Power on
+    res = i2c_write_read_reg(FUSB302_REG_POWER, FUSB302_POWER_ALL_ON);
+    uart_printf("FUSB302 POWER reg: 0x%02X\n", res);
+    fusb_delay_ms(10);
 
-    if (i2c_write_byte(FUSB302_REG_MASK, 0x00) != 0) {
-        uart_printf("FUSB302 Error: Failed to unmask INTERRUPT.\n");
-        return -1;
-    }
+    // Enable pull-ups on CC1 and CC2, set default USB current (80µA)
+    // Switches0: PU_EN2=1, PU_EN1=1, PDWN2=1, PDWN1=1
+    // This enables detection on both CC lines
+    res = i2c_write_read_reg(FUSB302_REG_SWITCHES0, FUSB302_SW0_PU_EN2 | FUSB302_SW0_PU_EN1 | FUSB302_SW0_PDWN2 | FUSB302_SW0_PDWN1);
+    uart_printf("FUSB302 SWITCHES0 reg: 0x%02X\n", res);
+    fusb_delay_ms(10);
 
-    // SWITCHES0: SWITCHES0: no PU_EN, no PDWN
-    if (i2c_write_byte(FUSB302_REG_SWITCHES0, 0x00) != 0) { result = -2; goto error_exit; }
+    // Set host current advertisement to default USB (80µA)
+    // Control0: HOST_CUR[1:0] = 01 (default current)
+    res = i2c_write_read_reg(FUSB302_REG_CONTROL0, (1 << FUSB302_CTL0_HOST_CUR_POS));
+    uart_printf("FUSB302 CONTROL0 reg: 0x%02X\n", res);
+    fusb_delay_ms(10);
 
-    // SWITCHES1: SPECREV=01 (PD2.0), AUTO_CRC=0, TXCCx=0
-    if (i2c_write_byte(FUSB302_REG_SWITCHES1, 0x20) != 0) { result = -3; goto error_exit; }
-
-    // CONTROL0: clear INT_MASK in CONTROL0 (read-modify-write)
-    uint8_t c0 = i2c_read_reg(FUSB302_REG_CONTROL0);
-    c0 &= ~FUSB302_CTL0_INT_MASK;
-    if (i2c_write_byte(FUSB302_REG_CONTROL0, c0) != 0) { result = -4; goto error_exit; }
-    
-    // CONTROL1: Enable SOP/SOP′/SOP″ decoding
-    if (i2c_write_byte(FUSB302_REG_CONTROL1, FUSB302_CTL1_ENSOP1 | FUSB302_CTL1_ENSOP2 | FUSB302_CTL1_ENSOP1DB | FUSB302_CTL1_ENSOP2DB) != 0) { result = -5; goto error_exit; }
-    
-    // CONTROL2: Enable RX receiver and BMC decoding
-    if (i2c_write_byte(FUSB302_REG_CONTROL2, 0x00) != 0) { result = -6; goto error_exit; }
-
-    // CONTROL3: Disable automatic GoodCRC / hard reset
-    if (i2c_write_byte(FUSB302_REG_CONTROL3, 0x00) != 0) { result = -7; goto error_exit; }
-    
-    uart_printf("FUSB302 Sniffer is configured and listening.\n");
     return 0;
-
-error_exit:
-    uart_printf("FUSB302 Error during setup sequence: Code %d\n", result);
-    return result;
 }
 
 /**
