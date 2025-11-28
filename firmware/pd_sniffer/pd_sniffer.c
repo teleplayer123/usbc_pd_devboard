@@ -306,10 +306,11 @@ int main(void) {
         while(1); // Stop execution
     }
 
-    // A sniffer passively monitors the two CC lines for traffic. 
-
+    // Main Loop: Wait for user input to check for PD messages
     while (1) {
-        // Continuously check the FUSB302 for captured messages
+        uart_printf("\nPress Enter to check for PD messages...\n");
+        usart_getc(); // Dummy read to initialize USART
+        // sniff packets
         check_and_read_fifo();
     }
     
