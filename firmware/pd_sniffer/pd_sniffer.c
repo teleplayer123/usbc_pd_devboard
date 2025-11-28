@@ -132,6 +132,9 @@ static int i2c_read_multi(uint8_t reg_addr, uint8_t *data, uint8_t len) {
     return 0;
 }
 
+static void i2c_read_reg(uint8_t reg, uint8_t *val) {
+    i2c_transfer7(I2C1, FUSB302_ADDR, &reg, 1, val, 1);
+}
 
 // --- FUSB302 PD Sniffer Configuration and Monitoring ---
 
@@ -168,14 +171,17 @@ static int fusb302_sniffer_setup(void) {
         return -1;
     }
 
-    // SWITCHES0: Enable pull-downs
-    if (i2c_write_byte(FUSB302_REG_SWITCHES0, FUSB302_SW0_PDWN1 | FUSB302_SW0_PDWN2) != 0) { result = -2; goto error_exit; }
+    // SWITCHES0: SWITCHES0: no PU_EN, no PDWN
+    if (i2c_write_byte(FUSB302_REG_SWITCHES0, 0x00) != 0) { result = -2; goto error_exit; }
 
-    // SWITCHES1: All off
-    if (i2c_write_byte(FUSB302_REG_SWITCHES1, 0x03) != 0) { result = -3; goto error_exit; }
+    // SWITCHES1: SPECREV=01 (PD2.0), AUTO_CRC=0, TXCCx=0
+    if (i2c_write_byte(FUSB302_REG_SWITCHES1, 0x20) != 0) { result = -3; goto error_exit; }
 
-    // CONTROL0: Disable TX
-    if (i2c_write_byte(FUSB302_REG_CONTROL0, 0x00) != 0) { result = -4; goto error_exit; }
+    // CONTROL0: clear INT_MASK in CONTROL0 (read-modify-write)
+    uint8_t c0;
+    i2c_read_reg(FUSB302_REG_CONTROL0, &c0);
+    c0 &= ~FUSB302_CTL0_INT_MASK;
+    if (i2c_write_byte(FUSB302_REG_CONTROL0, c0) != 0) { result = -4; goto error_exit; }
     
     // CONTROL1: Enable SOP/SOP′/SOP″ decoding
     if (i2c_write_byte(FUSB302_REG_CONTROL1, FUSB302_CTL1_ENSOP1 | FUSB302_CTL1_ENSOP2 | FUSB302_CTL1_ENSOP1DB | FUSB302_CTL1_ENSOP2DB) != 0) { result = -5; goto error_exit; }
