@@ -441,8 +441,8 @@ int main(void) {
     while (1) {
         fusb302_poll_fifo();
         // Debug breakpoint
+        uart_printf("Press Enter to poll again...\n");
         usart_getc(); // wait for user input
-        uart_printf("Polling again...\n");
     }
     
     
