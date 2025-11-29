@@ -398,12 +398,13 @@ int main(void) {
 
     // Main Loop: Wait for user input to check for PD messages
     while (1) {
-        // sniff packets
+        // Sniff packets
         check_and_read_fifo();
+        // Delay to avoid busy looping
+        fusb_delay_ms(5000);
+        // Debug prompt
         uart_printf("\nPress Enter to check for PD messages...\n");
         usart_getc(); // wait for user input
-        // Optional delay to avoid busy looping
-        fusb_delay_ms(5000);
     }
     
     return 0;
