@@ -180,7 +180,7 @@ static uint8_t i2c_write_read_reg(uint8_t reg, uint8_t val) {
 
 // --- FUSB302 PD Sniffer Configuration and Monitoring ---
 
-static void fusb302_monitor_cc_lines(void) {
+static void fusb302_check_cc_lines(void) {
     uint8_t status0 = i2c_read_reg(FUSB302_REG_STATUS0);
     if (status0 & FUSB302_STATUS0_COMP) { // COMP bit indicates something attached
         uint8_t bc_lvl = status0 & FUSB302_STATUS0_BC_LVL_MASK;
@@ -280,7 +280,7 @@ static void fusb302_sniffer_setup(void) {
     res = i2c_write_read_reg(FUSB302_REG_CONTROL1, FUSB302_CTL1_ENSOP1 | FUSB302_CTL1_ENSOP2);
     uart_printf("FUSB302 CONTROL1 reg: 0x%02X\n", res);
     
-    fusb302_monitor_cc_lines();
+    fusb302_check_cc_lines();
 }
 
 /**
