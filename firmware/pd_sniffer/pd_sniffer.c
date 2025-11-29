@@ -279,6 +279,7 @@ static void fusb302_monitor_cc_lines(void) {
             i2c_write_reg(FUSB302_REG_SWITCHES0, FUSB302_SW0_PU_EN2 | FUSB302_SW0_MEAS_CC2);
             // TXCC2=1, AUTO_CRC=1
             i2c_write_reg(FUSB302_REG_SWITCHES1, FUSB302_SW1_TXCC2 | FUSB302_SW1_AUTO_CRC);
+        }
     }
 }
 
