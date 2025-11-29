@@ -213,7 +213,8 @@ static void fusb302_check_cc_lines(void) {
             i2c_write_reg(FUSB302_REG_SWITCHES0, FUSB302_SW0_PU_EN2 | FUSB302_SW0_MEAS_CC2);
             // TXCC2=1, AUTO_CRC=1
             i2c_write_reg(FUSB302_REG_SWITCHES1, FUSB302_SW1_TXCC2 | FUSB302_SW1_AUTO_CRC);
-        }
+        } else {
+            uart_printf("Unable to determine CC line. CC1 Level: 0x%02X, CC2 Level: 0x%02X\n", cc1_level, cc2_level);
     }
 }
 
