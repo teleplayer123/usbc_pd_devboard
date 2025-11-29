@@ -255,6 +255,17 @@
 /* -----------------------------------------------------------
  * Tokens for FIFOS register
  * ----------------------------------------------------------- */
-
+enum fusb302_txfifo_tokens {
+    FUSB302_TX_TKN_TXON = 0xA1,
+    FUSB302_TX_TKN_SOP1 = 0x12,
+    FUSB302_TX_TKN_SOP2 = 0x13,
+    FUSB302_TX_TKN_SOP3 = 0x1B,
+    FUSB302_TX_TKN_RESET1 = 0x15,
+    FUSB302_TX_TKN_RESET2 = 0x16,
+    FUSB302_TX_TKN_PACKSYM = 0x80,
+    FUSB302_TX_TKN_JAMCRC = 0xFF,
+    FUSB302_TX_TKN_EOP = 0x14,
+    FUSB302_TX_TKN_TXOFF = 0xFE,
+};
 
 #endif /* FUSB302_H */
