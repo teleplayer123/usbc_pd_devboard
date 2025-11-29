@@ -295,8 +295,10 @@ static void check_and_read_fifo(void) {
         // Read packet from RX FIFO
         // First byte is SOP token
         uint8_t token = i2c_read_reg(FUSB302_REG_FIFOS);
+        uart_printf("SOP Token: 0x%02X\n", token);
         uint8_t packet[32];
         uint8_t status1 = i2c_read_reg(FUSB302_REG_STATUS1);
+        uart_printf("FUSB302 STATUS1: 0x%02X\n", status1);
         size_t index = 0;
 
         // While RX_EMPTY == 0
@@ -320,6 +322,7 @@ static void check_and_read_fifo(void) {
             // Read all available bytes until RX_EMPTY is set.
             while (1) {
                 uint8_t *buf = i2c_read_reg_fifo(FUSB302_REG_FIFOS);
+                uart_printf("--- Packet Hexdump ---\n");
                 uart_hexdump(buf, 80);
 
                 // Re-read STATUS0 to check for RX_EMPTY 
@@ -329,8 +332,8 @@ static void check_and_read_fifo(void) {
                 }
             }
         }
+        uart_printf("--- End of PD Message ---\n");
     }
-    uart_printf("--- End of PD Message ---\n");
 }
 
 
