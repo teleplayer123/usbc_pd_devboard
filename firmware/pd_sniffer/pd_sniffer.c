@@ -179,8 +179,11 @@ static uint8_t i2c_write_read_reg(uint8_t reg, uint8_t val) {
 }
 
 // --- FUSB302 PD Sniffer Configuration and Monitoring ---
-
-static void fusb302_check_cc_lines(void) {
+/**
+ * @brief Checks CC lines for device connection and configures FUSB302 accordingly.
+ */
+static int fusb302_check_cc_lines(void) {
+    int ret = 0;
     uint8_t status0 = i2c_read_reg(FUSB302_REG_STATUS0);
     if (status0 & FUSB302_STATUS0_COMP) { // COMP bit indicates something attached
         uint8_t bc_lvl = status0 & FUSB302_STATUS0_BC_LVL_MASK;
@@ -197,6 +200,8 @@ static void fusb302_check_cc_lines(void) {
         fusb_delay_ms(10);
         status0 = i2c_read_reg(FUSB302_REG_STATUS0);
         uint8_t cc2_level = status0 & FUSB302_STATUS0_BC_LVL_MASK;
+        // Return 1 if device detected
+        ret = 1;
 
         // Configure for detected orientation
         if (cc1_level > 0x00 && cc2_level == 0x00) {
@@ -216,7 +221,10 @@ static void fusb302_check_cc_lines(void) {
         }
     } else {
         uart_printf("No device detected on CC lines.\n");
+        // Return 0 if no device detected
+        ret = 0;
     }
+    return ret;
 }
 
 static void fusb302_sniffer_setup(void) {
@@ -281,9 +289,6 @@ static void fusb302_sniffer_setup(void) {
     // Control1: ENSOP1=1, ENSOP2=1
     res = i2c_write_read_reg(FUSB302_REG_CONTROL1, FUSB302_CTL1_ENSOP1 | FUSB302_CTL1_ENSOP2);
     uart_printf("FUSB302 CONTROL1 reg: 0x%02X\n", res);
-    
-    fusb_delay_ms(100);
-    fusb302_check_cc_lines();
 }
 
 /**
@@ -398,13 +403,21 @@ int main(void) {
 
     // Main Loop: Wait for user input to check for PD messages
     while (1) {
-        // Sniff packets
-        check_and_read_fifo();
-        // Delay to avoid busy looping
-        fusb_delay_ms(5000);
+        // Check CC lines for device connection
+        int dev_detected = fusb302_check_cc_lines();
+        if (!dev_detected) {
+            uart_printf("No device detected. Please connect a PD Source/Sink.\n");
+            uart_printf("Press Enter to retry...\n");
+            usart_getc(); // wait for user input
+            continue; // skip to next iteration
+        }
         // Debug prompt
         uart_printf("\nPress Enter to check for PD messages...\n");
         usart_getc(); // wait for user input
+        // Sniff packets
+        check_and_read_fifo();
+        // Delay to avoid busy looping
+        fusb_delay_ms(1);
     }
     
     return 0;
