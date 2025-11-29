@@ -307,32 +307,29 @@ static void check_and_read_fifo(void) {
         uart_printf("\n--- PD Message Captured ---\n");
         uart_hexdump(packet, index);
     } else {
-        uart_printf("No PD messages detected.\n");
-        return;
+        // Try another method: check STATUS1 for RX_FULL
+        // Read STATUS1 (0x41) to check RX_FULL bit (bit 4) and RX_EMPTY bit (bit 5)
+        uint8_t status1 = i2c_read_reg(FUSB302_REG_STATUS1);
+        uart_printf("FUSB302 STATUS1: 0x%02X\n", status1);
+
+        // Check if the RX_FULL flag is set (PD message received)
+        if (status1 & FUSB302_STATUS1_RX_FULL) {
+            uart_printf("\n--- PD Message Captured ---\n");
+            uart_printf("Raw FIFO Bytes (HEX): ");
+
+            // Read all available bytes until RX_EMPTY is set.
+            while (1) {
+                uint8_t *buf = i2c_read_reg_fifo(FUSB302_REG_FIFOS);
+                uart_hexdump(buf, 80);
+
+                // Re-read STATUS0 to check for RX_EMPTY 
+                if (i2c_read_reg(FUSB302_REG_STATUS1) & FUSB302_STATUS1_RX_EMPTY) {
+                    uart_printf("Error reading STATUS1 during FIFO read.\n");
+                    break;
+                }
+            }
+        }
     }
-
-    // // Read STATUS1 (0x41) to check RX_FULL bit (bit 4) and RX_EMPTY bit (bit 5)
-    // uint8_t status1 = i2c_read_reg(FUSB302_REG_STATUS1);
-    // uart_printf("FUSB302 STATUS1: 0x%02X\n", status1);
-
-    // // Check if the RX_FULL flag is set (PD message received)
-    // if (status1 & FUSB302_STATUS1_RX_FULL) {
-    //     uart_printf("\n--- PD Message Captured ---\n");
-    //     uart_printf("Raw FIFO Bytes (HEX): ");
-
-    //     // Read all available bytes until RX_EMPTY is set.
-    //     while (1) {
-    //         uint8_t *buf = i2c_read_reg_fifo(FUSB302_REG_FIFOS);
-    //         uart_hexdump(buf, 80);
-
-    //         // Re-read STATUS0 to check for RX_EMPTY 
-    //         if (i2c_read_reg(FUSB302_REG_STATUS1) & FUSB302_STATUS1_RX_EMPTY) {
-    //             uart_printf("Error reading STATUS1 during FIFO read.\n");
-    //             break;
-    //         }
-    //     }
-    //     
-    // }
     uart_printf("--- End of PD Message ---\n");
 }
 
@@ -386,7 +383,8 @@ int main(void) {
     uart_printf("\n--- FUSB302 PD Message Sniffer Started (UART) ---\n");
     uart_printf("Connect a PD Source/Sink to the USB-C receptacle.\n");
     uart_printf("I2C Address: 0x%02X\n", FUSB302_ADDR);
-    
+    uart_printf("Press Enter to continue...\n");
+    usart_getc(); // pause for user visual confirmation
     // Configure FUSB302 for Sniffing
     fusb302_sniffer_setup();
     uart_printf("\nPress Enter to check for PD messages...\n");
@@ -396,6 +394,10 @@ int main(void) {
     while (1) {
         // sniff packets
         check_and_read_fifo();
+        uart_printf("\nPress Enter to check for PD messages...\n");
+        usart_getc(); // wait for user input
+        // Optional delay to avoid busy looping
+        fusb_delay_ms(5000);
     }
     
     return 0;
