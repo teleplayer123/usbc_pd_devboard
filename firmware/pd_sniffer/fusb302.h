@@ -64,8 +64,7 @@
  * MEASURE (0x04)
  * ----------------------------------------------------------- */
 #define FUSB302_MEAS_VBUS           (1 << 6)
-#define FUSB302_MEAS_MDAC_POS       0
-#define FUSB302_MEAS_MDAC_MASK      (0x3F << FUSB302_MEAS_MDAC_POS)
+#define FUSB302_MEAS_MDAC_MV(mv)    (((mv)/42) & 0x3F) // MDAC step = 42mV
 
 /* -----------------------------------------------------------
  * SLICE (0x05)
@@ -82,6 +81,9 @@
 #define FUSB302_CTL0_INT_MASK       (1 << 5)
 #define FUSB302_CTL0_HOST_CUR_POS   2
 #define FUSB302_CTL0_HOST_CUR_MASK  (3 << FUSB302_CTL0_HOST_CUR_POS)
+#define FUSB302_CTL0_HOST_CUR_3A0   (3 << FUSB302_CTL0_HOST_CUR_POS)
+#define FUSB302_CTL0_HOST_CUR_1A5   (2 << FUSB302_CTL0_HOST_CUR_POS)
+#define FUSB302_CTL0_HOST_CUR_USB   (1 << FUSB302_CTL0_HOST_CUR_POS)
 #define FUSB302_CTL0_AUTO_PRE       (1 << 1)
 #define FUSB302_CTL0_TX_START       (1 << 0)
 
@@ -249,5 +251,10 @@
 #define FUSB302_INT_WAKE            (1 << 2)
 #define FUSB302_INT_COLLISION       (1 << 1)
 #define FUSB302_INT_BC_LVL          (1 << 0)
+
+/* -----------------------------------------------------------
+ * Tokens for FIFOS register
+ * ----------------------------------------------------------- */
+
 
 #endif /* FUSB302_H */
