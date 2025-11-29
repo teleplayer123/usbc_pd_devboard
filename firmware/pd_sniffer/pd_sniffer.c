@@ -440,7 +440,9 @@ int main(void) {
     uart_printf("Polling FIFO for PD messages constantly...\n");
     while (1) {
         fusb302_poll_fifo();
-        fusb_delay_ms(1);
+        // Debug breakpoint
+        usart_getc(); // wait for user input
+        uart_printf("Polling again...\n");
     }
     
     
