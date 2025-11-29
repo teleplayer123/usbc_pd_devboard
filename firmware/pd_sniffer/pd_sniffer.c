@@ -246,6 +246,42 @@ static int fusb302_sniffer_setup(void) {
     return 0;
 }
 
+static void fusb302_monitor_cc_lines(void) {
+    uint8_t status0 = i2c_read_reg(FUSB302_REG_STATUS0);
+    if (status0 & FUSB302_STATUS0_COMP) { // COMP bit indicates something attached
+        uint8_t bc_lvl = status0 & FUSB302_STATUS0_BC_LVL_MASK;
+
+        // Determine which CC line has the device
+        // Measure CC1 only: MEAS_CC1=1, PU_EN1=1
+        i2c_write_reg(FUSB302_REG_SWITCHES0, FUSB302_SW0_MEAS_CC1 | FUSB302_SW0_PU_EN1);
+        fusb_delay_ms(10);
+        status0 = i2c_read_reg(FUSB302_REG_STATUS0);
+        uint8_t cc1_level = status0 & FUSB302_STATUS0_BC_LVL_MASK;
+
+        // Measure CC2 only: MEAS_CC2=1, PU_EN2=1
+        i2c_write_reg(FUSB302_REG_SWITCHES0, FUSB302_SW0_MEAS_CC2 | FUSB302_SW0_PU_EN2);
+        fusb_delay_ms(10);
+        status0 = i2c_read_reg(FUSB302_REG_STATUS0);
+        uint8_t cc2_level = status0 & FUSB302_STATUS0_BC_LVL_MASK;
+
+        // Configure for detected orientation
+        if (cc1_level > 0x00 && cc2_level == 0x00) {
+            // Device on CC1
+            uart_printf("Device detected on CC1. BC_LVL: 0x%02X\n", cc1_level);
+            // PU_EN1=1, MEAS_CC1=1
+            i2c_write_reg(FUSB302_REG_SWITCHES0, FUSB302_SW0_PU_EN1 | FUSB302_SW0_MEAS_CC1);
+            // TXCC1=1, AUTO_CRC=1
+            i2c_write_reg(FUSB302_REG_SWITCHES1, FUSB302_SW1_TXCC1 | FUSB302_SW1_AUTO_CRC);
+        } else if (cc2_level > 0x00 && cc1_level == 0x00) {
+            // Device on CC2
+            uart_printf("Device detected on CC2. BC_LVL: 0x%02X\n", cc2_level);
+            // PU_EN2=1, MEAS_CC2=1
+            i2c_write_reg(FUSB302_REG_SWITCHES0, FUSB302_SW0_PU_EN2 | FUSB302_SW0_MEAS_CC2);
+            // TXCC2=1, AUTO_CRC=1
+            i2c_write_reg(FUSB302_REG_SWITCHES1, FUSB302_SW1_TXCC2 | FUSB302_SW1_AUTO_CRC);
+    }
+}
+
 /**
  * @brief Checks FUSB302 status and reads any captured PD messages from the FIFO.
  */
