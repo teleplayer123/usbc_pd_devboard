@@ -205,6 +205,44 @@ static int fusb302_sniffer_setup(void) {
     res = i2c_write_read_reg(FUSB302_REG_CONTROL0, (1 << FUSB302_CTL0_HOST_CUR_POS));
     uart_printf("FUSB302 CONTROL0 reg: 0x%02X\n", res);
 
+    // Measure block - start with default threshold
+    // Measure: MDAC[5:0] = 0x26 (1.6V threshold for Rd detection)
+    res = i2c_write_read_reg(FUSB302_REG_MEASURE, 0x26);
+
+    // Enable automatic GoodCRC response and BMC transmit on detected CC line
+    // Switches1: SPECREV[1:0]=01 (PD 2.0), AUTO_CRC=1
+    // TXCC1=1, TXCC2=1 (will auto-select based on orientation)
+    res = i2c_write_read_reg(FUSB302_REG_SWITCHES1, FUSB302_SW1_SPECREV0 | FUSB302_SW1_AUTO_CRC | FUSB302_SW1_TXCC1 | FUSB302_SW1_TXCC2);
+    uart_printf("FUSB302 SWITCHES1 reg: 0x%02X\n", res);
+
+    // Configure automatic retries and soft reset
+    // Control3: AUTO_RETRY=1, N_RETRIES=01, AUTO_SOFTRESET=1
+    res = i2c_write_read_reg(FUSB302_REG_CONTROL3, FUSB302_CTL3_AUTO_RETRY | (1 << FUSB302_CTL3_NRETRIES_POS) | FUSB302_CTL3_AUTO_SOFTRESET);
+    uart_printf("FUSB302 CONTROL3 reg: 0x%02X\n", res);
+
+    // Unmask interrupts for attach detection
+    // Mask: Enable all interrupts in this register
+    res = i2c_write_read_reg(FUSB302_REG_MASK, 0x00);
+    uart_printf("FUSB302 MASK reg: 0x%02X\n", res);
+
+    // Unmask PD interrupts
+    // Maska: Enable I_TOGDONE, I_CRC_CHK, I_TXSENT, etc.
+    res = i2c_write_read_reg(FUSB302_REG_MASKA, 0x00);
+    uart_printf("FUSB302 MASKA reg: 0x%02X\n", res);
+
+    // Clear any pending interrupts
+    // Read Interrupt registers to clear
+    uint8_t dummy;
+    dummy = i2c_read_reg(FUSB302_REG_INTERRUPT);
+    uart_printf("FUSB302 INTERRUPT reg: 0x%02X\n", dummy);
+    dummy = i2c_read_reg(FUSB302_REG_INTERRUPTA);
+    uart_printf("FUSB302 INTERRUPTA reg: 0x%02X\n", dummy);
+
+    // Enable SOP packet reception (standard PD messages)
+    // Control1: ENSOP1=1, ENSOP2=1
+    res = i2c_write_read_reg(FUSB302_REG_CONTROL1, FUSB302_CTL1_ENSOP1 | FUSB302_CTL1_ENSOP2);
+    uart_printf("FUSB302 CONTROL1 reg: 0x%02X\n", res);
+    
     return 0;
 }
 
