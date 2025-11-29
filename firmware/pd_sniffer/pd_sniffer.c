@@ -344,6 +344,17 @@ static void check_and_read_fifo(void) {
     }
 }
 
+// INT I2C Pin not connected by mistake, workaroud...
+static void fusb302_poll_fifo(void) {
+    // Read all available bytes in bursts
+    for (int i = 0; i < 1000; i++) {
+        uint8_t *buf = i2c_read_reg_fifo(FUSB302_REG_FIFOS);
+        if (sizeof(buf) > 0) {
+            uart_printf("--- Packet Hexdump %d ---\n", i);
+            uart_hexdump(buf, 80);
+        }
+    }
+}
 
 // --- Peripheral Setup ---
 
@@ -402,23 +413,31 @@ int main(void) {
     usart_getc(); // pause for user to plug in device
 
     // Main Loop: Wait for user input to check for PD messages
+    // while (1) {
+    //     // Check CC lines for device connection
+    //     int dev_detected = fusb302_check_cc_lines();
+    //     if (!dev_detected) {
+    //         uart_printf("No device detected. Please connect a PD Source/Sink.\n");
+    //         uart_printf("Press Enter to retry...\n");
+    //         usart_getc(); // wait for user input
+    //         continue; // skip to next iteration
+    //     }
+    //     // Debug prompt
+    //     uart_printf("\nPress Enter to check for PD messages...\n");
+    //     usart_getc(); // wait for user input
+    //     // Sniff packets
+    //     check_and_read_fifo();
+    //     // Delay to avoid busy looping
+    //     fusb_delay_ms(1);
+    // }
+
+    // Alternative: Poll FIFO directly (no INT pin)
+    uart_printf("Polling FIFO for PD messages constantly...\n");
     while (1) {
-        // Check CC lines for device connection
-        int dev_detected = fusb302_check_cc_lines();
-        if (!dev_detected) {
-            uart_printf("No device detected. Please connect a PD Source/Sink.\n");
-            uart_printf("Press Enter to retry...\n");
-            usart_getc(); // wait for user input
-            continue; // skip to next iteration
-        }
-        // Debug prompt
-        uart_printf("\nPress Enter to check for PD messages...\n");
-        usart_getc(); // wait for user input
-        // Sniff packets
-        check_and_read_fifo();
-        // Delay to avoid busy looping
+        fusb302_poll_fifo();
         fusb_delay_ms(1);
     }
+    
     
     return 0;
 }
