@@ -180,7 +180,44 @@ static uint8_t i2c_write_read_reg(uint8_t reg, uint8_t val) {
 
 // --- FUSB302 PD Sniffer Configuration and Monitoring ---
 
-static int fusb302_sniffer_setup(void) {
+static void fusb302_monitor_cc_lines(void) {
+    uint8_t status0 = i2c_read_reg(FUSB302_REG_STATUS0);
+    if (status0 & FUSB302_STATUS0_COMP) { // COMP bit indicates something attached
+        uint8_t bc_lvl = status0 & FUSB302_STATUS0_BC_LVL_MASK;
+
+        // Determine which CC line has the device
+        // Measure CC1 only: MEAS_CC1=1, PU_EN1=1
+        i2c_write_reg(FUSB302_REG_SWITCHES0, FUSB302_SW0_MEAS_CC1 | FUSB302_SW0_PU_EN1);
+        fusb_delay_ms(10);
+        status0 = i2c_read_reg(FUSB302_REG_STATUS0);
+        uint8_t cc1_level = status0 & FUSB302_STATUS0_BC_LVL_MASK;
+
+        // Measure CC2 only: MEAS_CC2=1, PU_EN2=1
+        i2c_write_reg(FUSB302_REG_SWITCHES0, FUSB302_SW0_MEAS_CC2 | FUSB302_SW0_PU_EN2);
+        fusb_delay_ms(10);
+        status0 = i2c_read_reg(FUSB302_REG_STATUS0);
+        uint8_t cc2_level = status0 & FUSB302_STATUS0_BC_LVL_MASK;
+
+        // Configure for detected orientation
+        if (cc1_level > 0x00 && cc2_level == 0x00) {
+            // Device on CC1
+            uart_printf("Device detected on CC1. BC_LVL: 0x%02X\n", cc1_level);
+            // PU_EN1=1, MEAS_CC1=1
+            i2c_write_reg(FUSB302_REG_SWITCHES0, FUSB302_SW0_PU_EN1 | FUSB302_SW0_MEAS_CC1);
+            // TXCC1=1, AUTO_CRC=1
+            i2c_write_reg(FUSB302_REG_SWITCHES1, FUSB302_SW1_TXCC1 | FUSB302_SW1_AUTO_CRC);
+        } else if (cc2_level > 0x00 && cc1_level == 0x00) {
+            // Device on CC2
+            uart_printf("Device detected on CC2. BC_LVL: 0x%02X\n", cc2_level);
+            // PU_EN2=1, MEAS_CC2=1
+            i2c_write_reg(FUSB302_REG_SWITCHES0, FUSB302_SW0_PU_EN2 | FUSB302_SW0_MEAS_CC2);
+            // TXCC2=1, AUTO_CRC=1
+            i2c_write_reg(FUSB302_REG_SWITCHES1, FUSB302_SW1_TXCC2 | FUSB302_SW1_AUTO_CRC);
+        }
+    }
+}
+
+static void fusb302_sniffer_setup(void) {
     uint8_t res;
     
     uart_printf("Initializing FUSB302 for PD Sniffing...\n");
@@ -243,44 +280,7 @@ static int fusb302_sniffer_setup(void) {
     res = i2c_write_read_reg(FUSB302_REG_CONTROL1, FUSB302_CTL1_ENSOP1 | FUSB302_CTL1_ENSOP2);
     uart_printf("FUSB302 CONTROL1 reg: 0x%02X\n", res);
     
-    return 0;
-}
-
-static void fusb302_monitor_cc_lines(void) {
-    uint8_t status0 = i2c_read_reg(FUSB302_REG_STATUS0);
-    if (status0 & FUSB302_STATUS0_COMP) { // COMP bit indicates something attached
-        uint8_t bc_lvl = status0 & FUSB302_STATUS0_BC_LVL_MASK;
-
-        // Determine which CC line has the device
-        // Measure CC1 only: MEAS_CC1=1, PU_EN1=1
-        i2c_write_reg(FUSB302_REG_SWITCHES0, FUSB302_SW0_MEAS_CC1 | FUSB302_SW0_PU_EN1);
-        fusb_delay_ms(10);
-        status0 = i2c_read_reg(FUSB302_REG_STATUS0);
-        uint8_t cc1_level = status0 & FUSB302_STATUS0_BC_LVL_MASK;
-
-        // Measure CC2 only: MEAS_CC2=1, PU_EN2=1
-        i2c_write_reg(FUSB302_REG_SWITCHES0, FUSB302_SW0_MEAS_CC2 | FUSB302_SW0_PU_EN2);
-        fusb_delay_ms(10);
-        status0 = i2c_read_reg(FUSB302_REG_STATUS0);
-        uint8_t cc2_level = status0 & FUSB302_STATUS0_BC_LVL_MASK;
-
-        // Configure for detected orientation
-        if (cc1_level > 0x00 && cc2_level == 0x00) {
-            // Device on CC1
-            uart_printf("Device detected on CC1. BC_LVL: 0x%02X\n", cc1_level);
-            // PU_EN1=1, MEAS_CC1=1
-            i2c_write_reg(FUSB302_REG_SWITCHES0, FUSB302_SW0_PU_EN1 | FUSB302_SW0_MEAS_CC1);
-            // TXCC1=1, AUTO_CRC=1
-            i2c_write_reg(FUSB302_REG_SWITCHES1, FUSB302_SW1_TXCC1 | FUSB302_SW1_AUTO_CRC);
-        } else if (cc2_level > 0x00 && cc1_level == 0x00) {
-            // Device on CC2
-            uart_printf("Device detected on CC2. BC_LVL: 0x%02X\n", cc2_level);
-            // PU_EN2=1, MEAS_CC2=1
-            i2c_write_reg(FUSB302_REG_SWITCHES0, FUSB302_SW0_PU_EN2 | FUSB302_SW0_MEAS_CC2);
-            // TXCC2=1, AUTO_CRC=1
-            i2c_write_reg(FUSB302_REG_SWITCHES1, FUSB302_SW1_TXCC2 | FUSB302_SW1_AUTO_CRC);
-        }
-    }
+    fusb302_monitor_cc_lines();
 }
 
 /**
@@ -288,29 +288,52 @@ static void fusb302_monitor_cc_lines(void) {
  */
 static void check_and_read_fifo(void) {
     uart_printf("Checking for PD messages...\n");
+    // I_CRC_CHK bit in INTERRUPT register indicates a received PD message
+    uint8_t interrupt = i2c_read_reg(FUSB302_REG_INTERRUPT);
+    if (interrupt & FUSB302_INT_CRC_CHK) {
+        uart_printf("PD Message Received Interrupt Detected.\n");
+        // Read packet from RX FIFO
+        // First byte is SOP token
+        uint8_t token = i2c_read_reg(FUSB302_REG_FIFOS);
+        uint8_t packet[32];
+        uint8_t status1 = i2c_read_reg(FUSB302_REG_STATUS1);
+        size_t index = 0;
 
-    // Read STATUS1 (0x41) to check RX_FULL bit (bit 4) and RX_EMPTY bit (bit 5)
-    uint8_t status0 = i2c_read_reg(FUSB302_REG_STATUS1);
-    uart_printf("FUSB302 STATUS1: 0x%02X\n", status0);
-
-    // Check if the RX_FULL flag is set (PD message received)
-    if (status0 & FUSB302_STATUS1_RX_FULL) {
-        uart_printf("\n--- PD Message Captured ---\n");
-        uart_printf("Raw FIFO Bytes (HEX): ");
-
-        // Read all available bytes until RX_EMPTY is set.
-        while (1) {
-            uint8_t *buf = i2c_read_reg_fifo(FUSB302_REG_FIFOS);
-            uart_hexdump(buf, 80);
-
-            // Re-read STATUS0 to check for RX_EMPTY 
-            if (i2c_read_reg(FUSB302_REG_STATUS1) & FUSB302_STATUS1_RX_EMPTY) {
-                uart_printf("Error reading STATUS1 during FIFO read.\n");
-                break;
-            }
+        // While RX_EMPTY == 0
+        while (!(status1 & FUSB302_STATUS1_RX_EMPTY)) {
+            packet[index++] = i2c_read_reg(FUSB302_REG_FIFOS);
+            status1 = i2c_read_reg(FUSB302_REG_STATUS1);
         }
-        uart_printf("--- End of PD Message ---\n");
+        uart_printf("\n--- PD Message Captured ---\n");
+        uart_hexdump(packet, index);
+    } else {
+        uart_printf("No PD messages detected.\n");
+        return;
     }
+
+    // // Read STATUS1 (0x41) to check RX_FULL bit (bit 4) and RX_EMPTY bit (bit 5)
+    // uint8_t status1 = i2c_read_reg(FUSB302_REG_STATUS1);
+    // uart_printf("FUSB302 STATUS1: 0x%02X\n", status1);
+
+    // // Check if the RX_FULL flag is set (PD message received)
+    // if (status1 & FUSB302_STATUS1_RX_FULL) {
+    //     uart_printf("\n--- PD Message Captured ---\n");
+    //     uart_printf("Raw FIFO Bytes (HEX): ");
+
+    //     // Read all available bytes until RX_EMPTY is set.
+    //     while (1) {
+    //         uint8_t *buf = i2c_read_reg_fifo(FUSB302_REG_FIFOS);
+    //         uart_hexdump(buf, 80);
+
+    //         // Re-read STATUS0 to check for RX_EMPTY 
+    //         if (i2c_read_reg(FUSB302_REG_STATUS1) & FUSB302_STATUS1_RX_EMPTY) {
+    //             uart_printf("Error reading STATUS1 during FIFO read.\n");
+    //             break;
+    //         }
+    //     }
+    //     
+    // }
+    uart_printf("--- End of PD Message ---\n");
 }
 
 
@@ -360,22 +383,17 @@ int main(void) {
     usart_setup();
     i2c_setup();
     
-    usart_getc(); // Dummy read to initialize USART
-
     uart_printf("\n--- FUSB302 PD Message Sniffer Started (UART) ---\n");
     uart_printf("Connect a PD Source/Sink to the USB-C receptacle.\n");
     uart_printf("I2C Address: 0x%02X\n", FUSB302_ADDR);
     
     // Configure FUSB302 for Sniffing
-    if (fusb302_sniffer_setup() != 0) {
-        uart_printf("FATAL: FUSB302 setup failed. Check I2C connection.\n");
-        while(1); // Stop execution
-    }
+    fusb302_sniffer_setup();
+    uart_printf("\nPress Enter to check for PD messages...\n");
+    usart_getc(); // pause for user to plug in device
 
     // Main Loop: Wait for user input to check for PD messages
     while (1) {
-        uart_printf("\nPress Enter to check for PD messages...\n");
-        usart_getc(); // Dummy read to initialize USART
         // sniff packets
         check_and_read_fifo();
     }
