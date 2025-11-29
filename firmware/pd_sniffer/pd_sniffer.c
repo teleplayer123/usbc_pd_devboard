@@ -349,7 +349,12 @@ static void fusb302_poll_fifo(void) {
     // Read all available bytes in bursts
     for (int i = 0; i < 1000; i++) {
         uint8_t *buf = i2c_read_reg_fifo(FUSB302_REG_FIFOS);
-        if (sizeof(buf) > 0) {
+        // Sum of values in buf to make sure not all zeros
+        size_t sum = 0;
+        for (size_t j = 0; j < 80; j++) {
+            sum += buf[j];
+        }
+        if (sum > 0) {
             uart_printf("--- Packet Hexdump %d ---\n", i);
             uart_hexdump(buf, 80);
         }
