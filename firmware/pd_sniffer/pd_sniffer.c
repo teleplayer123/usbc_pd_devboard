@@ -281,6 +281,7 @@ static void fusb302_sniffer_setup(void) {
     res = i2c_write_read_reg(FUSB302_REG_CONTROL1, FUSB302_CTL1_ENSOP1 | FUSB302_CTL1_ENSOP2);
     uart_printf("FUSB302 CONTROL1 reg: 0x%02X\n", res);
     
+    fusb_delay_ms(100);
     fusb302_check_cc_lines();
 }
 
