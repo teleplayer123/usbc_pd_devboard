@@ -354,8 +354,10 @@ int main(void) {
         //     usart_getc(); // wait for user input
         //     continue; // skip to next iteration
         // }
+
         // Poll FIFO for any received PD messages
-        fusb302_poll_fifo();
+        // fusb302_poll_fifo();
+        check_and_read_fifo();
 
         // Delay to avoid busy looping
         // fusb_delay_ms(1);
