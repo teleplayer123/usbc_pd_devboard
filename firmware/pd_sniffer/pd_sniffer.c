@@ -356,7 +356,7 @@ int main(void) {
         // }
 
         // Poll FIFO for any received PD messages
-        fusb302_poll_fifo();
+        // fusb302_poll_fifo();
         check_and_read_fifo();
 
         // Delay to avoid busy looping
