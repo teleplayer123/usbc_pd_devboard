@@ -349,7 +349,8 @@ static void check_and_read_fifo(void) {
 // INT I2C Pin not connected by mistake, workaroud...
 static void fusb302_poll_fifo(void) {
     // Read all available bytes in bursts
-    for (int i = 0; i < 1000; i++) {
+    uart_printf("Polling FIFO for PD messages...\n");
+    for (int i = 0; i < 5; i++) {
         uint8_t *buf = i2c_read_reg_fifo(FUSB302_REG_FIFOS);
         // Sum of values in buf to make sure not all zeros
         size_t sum = 0;
