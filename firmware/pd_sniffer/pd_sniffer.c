@@ -187,19 +187,22 @@ static int fusb302_check_cc_lines(void) {
     uint8_t status0 = i2c_read_reg(FUSB302_REG_STATUS0);
     if (status0 & FUSB302_STATUS0_COMP) { // COMP bit indicates something attached
         uint8_t bc_lvl = status0 & FUSB302_STATUS0_BC_LVL_MASK;
+        uart_printf("Device detected on CC lines. BC_LVL: 0x%02X\n", bc_lvl);
 
         // Determine which CC line has the device
         // Measure CC1 only: MEAS_CC1=1, PU_EN1=1
         i2c_write_reg(FUSB302_REG_SWITCHES0, FUSB302_SW0_MEAS_CC1 | FUSB302_SW0_PU_EN1);
-        fusb_delay_ms(10);
         status0 = i2c_read_reg(FUSB302_REG_STATUS0);
+        uart_printf("FUSB302 STATUS0 after CC1 measure: 0x%02X\n", status0);
         uint8_t cc1_level = status0 & FUSB302_STATUS0_BC_LVL_MASK;
+        uart_printf("CC1 BC_LVL: 0x%02X\n", cc1_level);
 
         // Measure CC2 only: MEAS_CC2=1, PU_EN2=1
         i2c_write_reg(FUSB302_REG_SWITCHES0, FUSB302_SW0_MEAS_CC2 | FUSB302_SW0_PU_EN2);
-        fusb_delay_ms(10);
         status0 = i2c_read_reg(FUSB302_REG_STATUS0);
+        uart_printf("FUSB302 STATUS0 after CC2 measure: 0x%02X\n", status0);
         uint8_t cc2_level = status0 & FUSB302_STATUS0_BC_LVL_MASK;
+        uart_printf("CC2 BC_LVL: 0x%02X\n", cc2_level);
         // Return 1 if device detected
         ret = 1;
 
@@ -316,28 +319,27 @@ static void check_and_read_fifo(void) {
         }
         uart_printf("\n--- PD Message Captured ---\n");
         uart_hexdump(packet, index);
-    } else {
-        // Try another method: check STATUS1 for RX_FULL
-        // Read STATUS1 (0x41) to check RX_FULL bit (bit 4) and RX_EMPTY bit (bit 5)
-        uint8_t status1 = i2c_read_reg(FUSB302_REG_STATUS1);
-        uart_printf("FUSB302 STATUS1: 0x%02X\n", status1);
+    }
+    // Try another method: check STATUS1 for RX_FULL
+    // Read STATUS1 (0x41) to check RX_FULL bit (bit 4) and RX_EMPTY bit (bit 5)
+    uint8_t status1 = i2c_read_reg(FUSB302_REG_STATUS1);
+    uart_printf("FUSB302 STATUS1: 0x%02X\n", status1);
 
-        // Check if the RX_FULL flag is set (PD message received)
-        if (status1 & FUSB302_STATUS1_RX_FULL) {
-            uart_printf("\n--- PD Message Captured ---\n");
-            uart_printf("Raw FIFO Bytes (HEX): ");
+    // Check if the RX_FULL flag is set (PD message received)
+    if (status1 & FUSB302_STATUS1_RX_FULL) {
+        uart_printf("\n--- PD Message Captured ---\n");
+        uart_printf("Raw FIFO Bytes (HEX): ");
 
-            // Read all available bytes until RX_EMPTY is set.
-            while (1) {
-                uint8_t *buf = i2c_read_reg_fifo(FUSB302_REG_FIFOS);
-                uart_printf("--- Packet Hexdump ---\n");
-                uart_hexdump(buf, 80);
+        // Read all available bytes until RX_EMPTY is set.
+        while (1) {
+            uint8_t *buf = i2c_read_reg_fifo(FUSB302_REG_FIFOS);
+            uart_printf("--- Packet Hexdump ---\n");
+            uart_hexdump(buf, 80);
 
-                // Re-read STATUS0 to check for RX_EMPTY 
-                if (i2c_read_reg(FUSB302_REG_STATUS1) & FUSB302_STATUS1_RX_EMPTY) {
-                    uart_printf("Error reading STATUS1 during FIFO read.\n");
-                    break;
-                }
+            // Re-read STATUS0 to check for RX_EMPTY 
+            if (i2c_read_reg(FUSB302_REG_STATUS1) & FUSB302_STATUS1_RX_EMPTY) {
+                uart_printf("Error reading STATUS1 during FIFO read.\n");
+                break;
             }
         }
         uart_printf("--- End of PD Message ---\n");
@@ -430,10 +432,12 @@ int main(void) {
         // Poll FIFO for any received PD messages
         fusb302_poll_fifo();
         // Debug breakpoint
-        uart_printf("Press Enter to poll again...\n");
+        uart_printf("Press Enter to try another way to poll...\n");
         usart_getc(); // wait for user input
         // Sniff packets
-        // check_and_read_fifo();
+        check_and_read_fifo();
+        uart_printf("Press Enter to poll again...\n");
+        usart_getc(); // wait for user input
         // Delay to avoid busy looping
         // fusb_delay_ms(1);
     }
