@@ -176,14 +176,12 @@ void fusb_setup_sniffer(uint32_t i2c) {
         FUSB302_SW1_DATAROLE |    // DFP
         FUSB302_SW1_AUTO_CRC);    // auto CRC
 
-    fusb_write_reg(i2c, FUSB302_REG_CONTROL3,
-        0x00);                    // sniffer mode
-
-    fusb_write_reg(i2c, FUSB302_REG_MASKA,
-        0x00);                    // unmask all interrupts
-
-    fusb_write_reg(i2c, FUSB302_REG_MASKB,
-        0x00);                    // unmask all interrupts
+    // sniffer mode
+    fusb_write_reg(i2c, FUSB302_REG_CONTROL3, 0x00);                    
+    // unmask interrupts
+    fusb_write_reg(i2c, FUSB302_REG_MASK, 0x00);
+    fusb_write_reg(i2c, FUSB302_REG_MASKA, 0x00);
+    fusb_write_reg(i2c, FUSB302_REG_MASKB, 0x00);                    
 }
 
 /* CLI parser */
