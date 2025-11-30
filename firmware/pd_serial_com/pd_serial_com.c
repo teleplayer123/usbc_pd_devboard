@@ -71,15 +71,13 @@ static uint8_t *print_byte_as_bits(unsigned char byte) {
     return buf;
 }
 
-void dump_bits(uint8_t reg, const struct bit_name *tbl, size_t len)
+void dump_bits(uint8_t reg, const struct bit_name *tbl)
 {
-    for (size_t i = 0; i < len; i++) {
-        if (!tbl[i].name)
+    for (size_t i = 0; i < 8; i++) {
+        if (tbl[i].name == NULL)
             continue;  // skip unused bits             
 
-        printf("%s = %d\n",
-               tbl[i].name,
-               !!(reg & tbl[i].mask));
+        printf("%s = %d\n", tbl[i].name, !!(reg & tbl[i].mask));
     }
 }
 
