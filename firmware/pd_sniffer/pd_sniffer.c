@@ -191,7 +191,7 @@ static void fusb302_sniffer_setup(void) {
     res = i2c_read_reg(FUSB302_REG_SWITCHES0);
     clear_mask = ~(FUSB302_SW0_MEAS_CC1 | FUSB302_SW0_MEAS_CC2) & 0xFF;
     res &= clear_mask;
-    // This means the cable must be orented for CC2 
+    // This means the cable must be oriented for CC2 
     res |= FUSB302_SW0_MEAS_CC2;
     i2c_write_reg(FUSB302_REG_SWITCHES0, res);
 
