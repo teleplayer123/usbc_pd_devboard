@@ -273,7 +273,7 @@ enum fusb302_txfifo_tokens {
  * Register structs
  * ----------------------------------------------------------- */
  struct bit_name {
-    uint8_t mask;
+    int mask;
     const char *name;
 };
 

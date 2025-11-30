@@ -73,7 +73,7 @@ static uint8_t *print_byte_as_bits(unsigned char byte) {
 
 void dump_bits(uint8_t reg, const struct bit_name *tbl)
 {
-    for (size_t i = 0; i < 8; i++) {
+    for (int i = 0; i < 8; i++) {
         if (tbl[i].name == NULL)
             continue;  // skip unused bits             
 
