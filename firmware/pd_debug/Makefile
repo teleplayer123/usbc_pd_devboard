@@ -1,4 +1,4 @@
-PROJECT = pd_serial_com
+PROJECT = pd_debug
 BUILD_DIR = build
 DEVICE = stm32f072cb
 LDSCRIPT = stm32f072cbx.ld
