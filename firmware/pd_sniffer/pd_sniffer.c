@@ -427,7 +427,7 @@ int main(void) {
             uart_printf("No device detected. Please connect a PD Source/Sink.\n");
             uart_printf("Press Enter to retry...\n");
             usart_getc(); // wait for user input
-            continue; // skip to next iteration
+            // continue; // skip to next iteration
         }
         // Poll FIFO for any received PD messages
         fusb302_poll_fifo();
