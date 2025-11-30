@@ -84,6 +84,8 @@
 #define FUSB302_CTL0_HOST_CUR_3A0   (3 << FUSB302_CTL0_HOST_CUR_POS)
 #define FUSB302_CTL0_HOST_CUR_1A5   (2 << FUSB302_CTL0_HOST_CUR_POS)
 #define FUSB302_CTL0_HOST_CUR_USB   (1 << FUSB302_CTL0_HOST_CUR_POS)
+#define FUSB302_CTL0_HOST_CUR1      (1 << 3)
+#define FUSB302_CTL0_HOST_CUR0      (1 << 2)
 #define FUSB302_CTL0_AUTO_PRE       (1 << 1)
 #define FUSB302_CTL0_TX_START       (1 << 0)
 
@@ -121,6 +123,8 @@
 #define FUSB302_CTL3_AUTO_SOFTRESET (1 << 3)
 #define FUSB302_CTL3_NRETRIES_POS   1
 #define FUSB302_CTL3_NRETRIES_MASK  (3 << FUSB302_CTL3_NRETRIES_POS)
+#define FUSB302_CTL3_NRETRIES1      (1 << 2)
+#define FUSB302_CTL3_NRETRIES0      (1 << 1)
 #define FUSB302_CTL3_AUTO_RETRY     (1 << 0)
 
 /* -----------------------------------------------------------
@@ -225,6 +229,8 @@
 #define FUSB302_STATUS0_CRC_CHK     (1 << 4)
 #define FUSB302_STATUS0_ALERT       (1 << 3)
 #define FUSB302_STATUS0_WAKE        (1 << 2)
+#define FUSB302_STATUS0_BC_LVL1     (1 << 1)
+#define FUSB302_STATUS0_BC_LVL0     (1 << 0)
 #define FUSB302_STATUS0_BC_LVL_POS  0
 #define FUSB302_STATUS0_BC_LVL_MASK (3 << FUSB302_STATUS0_BC_LVL_POS)
 
@@ -270,7 +276,7 @@ enum fusb302_txfifo_tokens {
 };
 
 /* -----------------------------------------------------------
- * Register structs
+ * Register structs for debugging (printing bits)
  * ----------------------------------------------------------- */
  struct bit_name {
     int mask;
@@ -284,7 +290,8 @@ static const struct bit_name fusb302_status0_bits[] = {
     {FUSB302_STATUS0_CRC_CHK, "CRC_CHK"},
     {FUSB302_STATUS0_ALERT, "ALERT"},
     {FUSB302_STATUS0_WAKE, "WAKE"},
-    {FUSB302_STATUS0_BC_LVL_MASK, "BC_LVL"},
+    {FUSB302_STATUS0_BC_LVL1, "BC_LVL1"},
+    {FUSB302_STATUS0_BC_LVL0, "BC_LVL0"},
 };
 
 static const struct bit_name fusb302_status1_bits[] = {
@@ -299,17 +306,19 @@ static const struct bit_name fusb302_status1_bits[] = {
 };
 
 static const struct bit_name fusb302_interrupt_bits[] = {
-    {FUSB302_INT_VBUSOK, "VBUSOK"},
-    {FUSB302_INT_ACTIVITY, "ACTIVITY"},
-    {FUSB302_INT_COMP_CHNG, "COMP_CHNG"},
-    {FUSB302_INT_CRC_CHK, "CRC_CHK"},
-    {FUSB302_INT_ALERT, "ALERT"},
-    {FUSB302_INT_WAKE, "WAKE"},
-    {FUSB302_INT_COLLISION, "COLLISION"},
-    {FUSB302_INT_BC_LVL, "BC_LVL"},
+    {FUSB302_INT_VBUSOK, "I_VBUSOK"},
+    {FUSB302_INT_ACTIVITY, "I_ACTIVITY"},
+    {FUSB302_INT_COMP_CHNG, "I_COMP_CHNG"},
+    {FUSB302_INT_CRC_CHK, "I_CRC_CHK"},
+    {FUSB302_INT_ALERT, "I_ALERT"},
+    {FUSB302_INT_WAKE, "I_WAKE"},
+    {FUSB302_INT_COLLISION, "I_COLLISION"},
+    {FUSB302_INT_BC_LVL, "I_BC_LVL"},
 };
 
 static const struct bit_name fusb302_status0a_bits[] = {
+    {BIT(7), NULL},
+    {BIT(6), NULL},
     {FUSB302_STATUS0A_SOFTFAIL, "SOFTFAIL"},
     {FUSB302_STATUS0A_RETRYFAIL, "RETRYFAIL"},
     {FUSB302_STATUS0A_POWER3, "POWER3"},
@@ -319,6 +328,8 @@ static const struct bit_name fusb302_status0a_bits[] = {
 };
 
 static const struct bit_name fusb302_status1a_bits[] = {
+    {BIT(7), NULL},
+    {BIT(6), NULL},
     {FUSB302_STATUS1A_TOGSS3, "TOGSS3"},
     {FUSB302_STATUS1A_TOGSS2, "TOGSS2"},
     {FUSB302_STATUS1A_TOGSS1, "TOGSS1"},
@@ -328,14 +339,14 @@ static const struct bit_name fusb302_status1a_bits[] = {
 };
 
 static const struct bit_name fusb302_interrupta_bits[] = {
-    {FUSB302_INTA_OCP_TEMP, "OCP_TEMP"},
-    {FUSB302_INTA_TOGDONE, "TOGDONE"},
-    {FUSB302_INTA_SOFTFAIL, "SOFTFAIL"},
-    {FUSB302_INTA_RETRYFAIL, "RETRYFAIL"},
-    {FUSB302_INTA_HARDSENT, "HARDSENT"},
-    {FUSB302_INTA_TXSENT, "TXSENT"},
-    {FUSB302_INTA_SOFTRST, "SOFTRST"},
-    {FUSB302_INTA_HARDRST, "HARDRST"},
+    {FUSB302_INTA_OCP_TEMP, "I_OCP_TEMP"},
+    {FUSB302_INTA_TOGDONE, "I_TOGDONE"},
+    {FUSB302_INTA_SOFTFAIL, "I_SOFTFAIL"},
+    {FUSB302_INTA_RETRYFAIL, "I_RETRYFAIL"},
+    {FUSB302_INTA_HARDSENT, "I_HARDSENT"},
+    {FUSB302_INTA_TXSENT, "I_TXSENT"},
+    {FUSB302_INTA_SOFTRST, "I_SOFTRST"},
+    {FUSB302_INTA_HARDRST, "I_HARDRST"},
 };
 
 static const struct bit_name fusb302_switches0_bits[] = {
@@ -365,7 +376,8 @@ static const struct bit_name fusb302_control0_bits[] = {
     {FUSB302_CTL0_TX_FLUSH, "TX_FLUSH"},
     {FUSB302_CTL0_INT_MASK, "INT_MASK"},
     {BIT(4), NULL},
-    {FUSB302_CTL0_HOST_CUR_MASK, "HOST_CUR"},
+    {FUSB302_CTL0_HOST_CUR1, "HOST_CUR1"},
+    {FUSB302_CTL0_HOST_CUR0, "HOST_CUR0"},
     {FUSB302_CTL0_AUTO_PRE, "AUTO_PRE"},
     {FUSB302_CTL0_TX_START, "TX_START"},
 };
@@ -376,7 +388,8 @@ static const struct bit_name fusb302_control3_bits[] = {
     {FUSB302_CTL3_BIST_TMODE, "BIST_TMODE"},
     {FUSB302_CTL3_AUTO_HARDRESET, "AUTO_HARDRESET"},
     {FUSB302_CTL3_AUTO_SOFTRESET, "AUTO_SOFTRESET"},
-    {FUSB302_CTL3_NRETRIES_MASK, "NRETRIES"},
+    {FUSB302_CTL3_NRETRIES1, "NRETRIES1"},
+    {FUSB302_CTL3_NRETRIES0, "NRETRIES0"},
     {FUSB302_CTL3_AUTO_RETRY, "AUTO_RETRY"},
 };
 

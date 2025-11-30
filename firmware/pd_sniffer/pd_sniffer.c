@@ -111,6 +111,8 @@ static int fusb302_check_cc_lines(void) {
     int ret = 0;
     uint8_t status0 = i2c_read_reg(FUSB302_REG_STATUS0);
     if (status0 & FUSB302_STATUS0_COMP) { // COMP bit indicates something attached
+        /*BC_LVL is only defined when Measure block is on which is when
+          register bits PWR[2]=1 and either MEAS_CC1=1 or MEAS_CC2=1*/
         uint8_t bc_lvl = status0 & FUSB302_STATUS0_BC_LVL_MASK;
         uart_printf("Device detected on CC lines. BC_LVL: 0x%02X\n", bc_lvl);
 
