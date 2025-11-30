@@ -58,6 +58,7 @@ static char usart_getc(void) {
 }
 
 static void print_byte_as_bits(uint8_t byte) {
+    printf("Reg %02X: ", byte);
     for (int i = 7; i >= 0; i--) { // Loop from most significant bit (7) to least significant (0)
         // Use a bitwise AND with a mask to check if the current bit is set
         // The mask is 1 shifted left by 'i' positions
