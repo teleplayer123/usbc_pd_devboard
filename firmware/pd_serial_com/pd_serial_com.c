@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include "fusb302.h"
 
+/*---- MCU setup functions ----*/
 
 static void clock_setup(void) {
     rcc_clock_setup_in_hsi_out_48mhz();
@@ -43,6 +44,8 @@ static void i2c_setup(void) {
     i2c_peripheral_enable(I2C1);
 }
 
+/*---- Helper/Essential Functions ----*/
+
 /* simple blocking getchar/putchar */
 int _write(int fd, char *ptr, int len) {
     (void)fd;
@@ -54,7 +57,21 @@ static char usart_getc(void) {
     return usart_recv_blocking(USART2); 
 }
 
-/* I2C helpers */
+static uint8_t *print_byte_as_bits(unsigned char byte) {
+    static uint8_t buf[8];
+    for (int i = 7; i >= 0; i--) { // Loop from most significant bit (7) to least significant (0)
+        // Use a bitwise AND with a mask to check if the current bit is set
+        // The mask is 1 shifted left by 'i' positions
+        if ((byte >> i) & 1) { 
+            buf[i] = 1;
+        } else {
+            buf[i] = 0;
+        }
+    }
+    return buf;
+}
+
+/*---- I2C functions ----*/
 /*
 void i2c_transfer7(uint32_t i2c, uint8_t addr, const uint8_t *w, size_t wn, uint8_t *r, size_t rn);
     i2c: The base address of the I2C peripheral
@@ -113,22 +130,24 @@ static bool i2c_probe_addr(uint32_t i2c, uint8_t addr) {
     }
 }
 
+/*---- FUSB302 functions ----*/
+
 void fusb_delay_ms(uint32_t ms) {
     for (volatile uint32_t i=0; i<ms*4800; i++);
 }
 
 void fusb_reset(uint32_t i2c) {
     fusb_write_reg(i2c, FUSB302_REG_RESET, FUSB302_RESET_SW);
-    fusb_delay_ms(1);
+    fusb_delay_ms(10);
 }
 
 void fusb_pd_reset(uint32_t i2c) {
     fusb_write_reg(i2c, FUSB302_REG_RESET, FUSB302_RESET_PD);
-    fusb_delay_ms(1);
+    fusb_delay_ms(10);
 }
 
-void fusb_wake_from_sleep(uint32_t i2c) {
-    fusb_write_reg(i2c, FUSB302_REG_POWER, 0x0F);
+void fusb_power_all(uint32_t i2c) {
+    fusb_write_reg(i2c, FUSB302_REG_POWER, FUSB302_POWER_ALL_ON);
     fusb_delay_ms(1);
 }
 
@@ -168,7 +187,7 @@ static void handle_command(char *line) {
         uint8_t val = (uint8_t)strtol(p, NULL, 0);
         fusb_write_reg(I2C1, reg, val);
         printf("write[0x%02X] = 0x%02X\r\n", reg, val);
-    } else if (line[0] == 's') {
+    } else if (line[0] == 'p') {
         printf("Scanning I2C...\r\n");
         for (uint8_t addr=1; addr<0x7F; addr++) {
             if (i2c_probe_addr(I2C1, addr)) {
@@ -198,8 +217,16 @@ static void handle_command(char *line) {
         }
         fusb_write_reg_nbytes(I2C1, reg, buf, nbytes);
         printf("bulk wrote %u bytes to reg 0x%02X\r\n", (unsigned)nbytes, reg);
+    } else if (line[0] == 'c') {
+        // Check bits set in register
+        uint8_t reg = (uint8_t)strtol(&line[1], NULL, 0);
+        uint8_t val;
+        fusb_read_reg(I2C1, reg, &val);
+        
+    } else if (line[0] == 's') {
+
     } else {
-        printf("Commands:\r\n  r <reg>\r\n  w <reg> <val>\r\n  s (scan)\r\n  b <reg>\r\n  n <reg> <val1> <val2> ...\r\n");
+        printf("Commands:\r\n  r <reg>\r\n  w <reg> <val>\r\n  p (probe)\r\n  b <reg>\r\n  n <reg> <val1> <val2> ...\r\n  c <reg> (check register set bits)");
     }
 }
 

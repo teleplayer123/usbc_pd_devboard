@@ -64,8 +64,7 @@
  * MEASURE (0x04)
  * ----------------------------------------------------------- */
 #define FUSB302_MEAS_VBUS           (1 << 6)
-#define FUSB302_MEAS_MDAC_POS       0
-#define FUSB302_MEAS_MDAC_MASK      (0x3F << FUSB302_MEAS_MDAC_POS)
+#define FUSB302_MEAS_MDAC_MV(mv)    (((mv)/42) & 0x3F) // MDAC step = 42mV
 
 /* -----------------------------------------------------------
  * SLICE (0x05)
@@ -82,6 +81,9 @@
 #define FUSB302_CTL0_INT_MASK       (1 << 5)
 #define FUSB302_CTL0_HOST_CUR_POS   2
 #define FUSB302_CTL0_HOST_CUR_MASK  (3 << FUSB302_CTL0_HOST_CUR_POS)
+#define FUSB302_CTL0_HOST_CUR_3A0   (3 << FUSB302_CTL0_HOST_CUR_POS)
+#define FUSB302_CTL0_HOST_CUR_1A5   (2 << FUSB302_CTL0_HOST_CUR_POS)
+#define FUSB302_CTL0_HOST_CUR_USB   (1 << FUSB302_CTL0_HOST_CUR_POS)
 #define FUSB302_CTL0_AUTO_PRE       (1 << 1)
 #define FUSB302_CTL0_TX_START       (1 << 0)
 
@@ -140,6 +142,7 @@
 #define FUSB302_POWER_RX_REF        (1 << 1)
 #define FUSB302_POWER_MEAS_BLOCK    (1 << 2)
 #define FUSB302_POWER_INTERNAL_OSC  (1 << 3)
+#define FUSB302_POWER_ALL_ON        (FUSB302_POWER_BANDGAP | FUSB302_POWER_RX_REF | FUSB302_POWER_MEAS_BLOCK | FUSB302_POWER_INTERNAL_OSC)
 
 /* -----------------------------------------------------------
  * RESET (0x0C)
@@ -250,8 +253,19 @@
 #define FUSB302_INT_BC_LVL          (1 << 0)
 
 /* -----------------------------------------------------------
- * FIFO (0x43)
+ * Tokens for FIFOS register
  * ----------------------------------------------------------- */
-#define FUSB302_FIFO_BYTE           0x43
+enum fusb302_txfifo_tokens {
+    FUSB302_TX_TKN_TXON = 0xA1,
+    FUSB302_TX_TKN_SOP1 = 0x12,
+    FUSB302_TX_TKN_SOP2 = 0x13,
+    FUSB302_TX_TKN_SOP3 = 0x1B,
+    FUSB302_TX_TKN_RESET1 = 0x15,
+    FUSB302_TX_TKN_RESET2 = 0x16,
+    FUSB302_TX_TKN_PACKSYM = 0x80,
+    FUSB302_TX_TKN_JAMCRC = 0xFF,
+    FUSB302_TX_TKN_EOP = 0x14,
+    FUSB302_TX_TKN_TXOFF = 0xFE,
+};
 
 #endif /* FUSB302_H */
