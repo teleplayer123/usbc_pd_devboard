@@ -71,6 +71,18 @@ static uint8_t *print_byte_as_bits(unsigned char byte) {
     return buf;
 }
 
+void dump_bits(uint8_t reg, const struct bit_name *tbl, size_t len)
+{
+    for (size_t i = 0; i < len; i++) {
+        if (!tbl[i].name)
+            continue;  // skip unused bits             
+
+        printf("%s = %d\n",
+               tbl[i].name,
+               !!(reg & tbl[i].mask));
+    }
+}
+
 /*---- I2C functions ----*/
 /*
 void i2c_transfer7(uint32_t i2c, uint8_t addr, const uint8_t *w, size_t wn, uint8_t *r, size_t rn);
@@ -132,23 +144,29 @@ static bool i2c_probe_addr(uint32_t i2c, uint8_t addr) {
 
 /*---- FUSB302 functions ----*/
 
-void fusb_delay_ms(uint32_t ms) {
+static void fusb_delay_ms(uint32_t ms) {
     for (volatile uint32_t i=0; i<ms*4800; i++);
 }
 
-void fusb_reset(uint32_t i2c) {
+static void fusb_reset(uint32_t i2c) {
     fusb_write_reg(i2c, FUSB302_REG_RESET, FUSB302_RESET_SW);
     fusb_delay_ms(10);
 }
 
-void fusb_pd_reset(uint32_t i2c) {
+static void fusb_pd_reset(uint32_t i2c) {
     fusb_write_reg(i2c, FUSB302_REG_RESET, FUSB302_RESET_PD);
     fusb_delay_ms(10);
 }
 
-void fusb_power_all(uint32_t i2c) {
+static void fusb_power_all(uint32_t i2c) {
     fusb_write_reg(i2c, FUSB302_REG_POWER, FUSB302_POWER_ALL_ON);
     fusb_delay_ms(1);
+}
+
+static uint8_t fusb_get_chip_id(uint32_t i2c) {
+    uint8_t id;
+    fusb_read_reg(i2c, FUSB302_REG_DEVICE_ID, &id);
+    return id;
 }
 
 void fusb_setup_sniffer(uint32_t i2c) {

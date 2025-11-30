@@ -252,6 +252,7 @@
 #define FUSB302_INT_COLLISION       (1 << 1)
 #define FUSB302_INT_BC_LVL          (1 << 0)
 
+#define BIT(x) (1 << (x))
 /* -----------------------------------------------------------
  * Tokens for FIFOS register
  * ----------------------------------------------------------- */
@@ -266,6 +267,117 @@ enum fusb302_txfifo_tokens {
     FUSB302_TX_TKN_JAMCRC = 0xFF,
     FUSB302_TX_TKN_EOP = 0x14,
     FUSB302_TX_TKN_TXOFF = 0xFE,
+};
+
+/* -----------------------------------------------------------
+ * Register structs
+ * ----------------------------------------------------------- */
+ struct bit_name {
+    uint8_t mask;
+    const char *name;
+};
+
+static const struct bit_name fusb302_status0_bits[] = {
+    {FUSB302_STATUS0_VBUSOK, "VBUSOK"},
+    {FUSB302_STATUS0_ACTIVITY, "ACTIVITY"},
+    {FUSB302_STATUS0_COMP, "COMP"},
+    {FUSB302_STATUS0_CRC_CHK, "CRC_CHK"},
+    {FUSB302_STATUS0_ALERT, "ALERT"},
+    {FUSB302_STATUS0_WAKE, "WAKE"},
+    {FUSB302_STATUS0_BC_LVL_MASK, "BC_LVL"},
+};
+
+static const struct bit_name fusb302_status1_bits[] = {
+    {FUSB302_STATUS1_RXSOP2, "RXSOP2"},
+    {FUSB302_STATUS1_RXSOP1, "RXSOP1"},
+    {FUSB302_STATUS1_RX_EMPTY, "RX_EMPTY"},
+    {FUSB302_STATUS1_RX_FULL, "RX_FULL"},
+    {FUSB302_STATUS1_TX_EMPTY, "TX_EMPTY"},
+    {FUSB302_STATUS1_TX_FULL, "TX_FULL"},
+    {FUSB302_STATUS1_OVRTEMP, "OVRTEMP"},
+    {FUSB302_STATUS1_OCP, "OCP"},
+};
+
+static const struct bit_name fusb302_interrupt_bits[] = {
+    {FUSB302_INT_VBUSOK, "VBUSOK"},
+    {FUSB302_INT_ACTIVITY, "ACTIVITY"},
+    {FUSB302_INT_COMP_CHNG, "COMP_CHNG"},
+    {FUSB302_INT_CRC_CHK, "CRC_CHK"},
+    {FUSB302_INT_ALERT, "ALERT"},
+    {FUSB302_INT_WAKE, "WAKE"},
+    {FUSB302_INT_COLLISION, "COLLISION"},
+    {FUSB302_INT_BC_LVL, "BC_LVL"},
+};
+
+static const struct bit_name fusb302_status0a_bits[] = {
+    {FUSB302_STATUS0A_SOFTFAIL, "SOFTFAIL"},
+    {FUSB302_STATUS0A_RETRYFAIL, "RETRYFAIL"},
+    {FUSB302_STATUS0A_POWER3, "POWER3"},
+    {FUSB302_STATUS0A_POWER2, "POWER2"},
+    {FUSB302_STATUS0A_SOFTRST, "SOFTRST"},
+    {FUSB302_STATUS0A_HARDRST, "HARDRST"},
+};
+
+static const struct bit_name fusb302_status1a_bits[] = {
+    {FUSB302_STATUS1A_TOGSS3, "TOGSS3"},
+    {FUSB302_STATUS1A_TOGSS2, "TOGSS2"},
+    {FUSB302_STATUS1A_TOGSS1, "TOGSS1"},
+    {FUSB302_STATUS1A_RXSOP2DB, "RXSOP2DB"},
+    {FUSB302_STATUS1A_RXSOP1DB, "RXSOP1DB"},
+    {FUSB302_STATUS1A_RXSOP, "RXSOP"},
+};
+
+static const struct bit_name fusb302_interrupta_bits[] = {
+    {FUSB302_INTA_OCP_TEMP, "OCP_TEMP"},
+    {FUSB302_INTA_TOGDONE, "TOGDONE"},
+    {FUSB302_INTA_SOFTFAIL, "SOFTFAIL"},
+    {FUSB302_INTA_RETRYFAIL, "RETRYFAIL"},
+    {FUSB302_INTA_HARDSENT, "HARDSENT"},
+    {FUSB302_INTA_TXSENT, "TXSENT"},
+    {FUSB302_INTA_SOFTRST, "SOFTRST"},
+    {FUSB302_INTA_HARDRST, "HARDRST"},
+};
+
+static const struct bit_name fusb302_switches0_bits[] = {
+    {FUSB302_SW0_PU_EN2, "PU_EN2"},
+    {FUSB302_SW0_PU_EN1, "PU_EN1"},
+    {FUSB302_SW0_VCONN_CC2, "VCONN_CC2"},
+    {FUSB302_SW0_VCONN_CC1, "VCONN_CC1"},
+    {FUSB302_SW0_MEAS_CC2, "MEAS_CC2"},
+    {FUSB302_SW0_MEAS_CC1, "MEAS_CC1"},
+    {FUSB302_SW0_PDWN2, "PDWN2"},
+    {FUSB302_SW0_PDWN1, "PDWN1"},
+};
+
+static const struct bit_name fusb302_switches1_bits[] = {
+    {FUSB302_SW1_POWERROLE, "POWERROLE"},
+    {FUSB302_SW1_SPECREV1, "SPECREV1"},
+    {FUSB302_SW1_SPECREV0, "SPECREV0"},
+    {FUSB302_SW1_DATAROLE, "DATAROLE"},
+    {BIT(3), NULL},
+    {FUSB302_SW1_AUTO_CRC, "AUTO_CRC"},
+    {FUSB302_SW1_TXCC2, "TXCC2"},
+    {FUSB302_SW1_TXCC1, "TXCC1"},
+};
+
+static const struct bit_name fusb302_control0_bits[] = {
+    {BIT(7), NULL},
+    {FUSB302_CTL0_TX_FLUSH, "TX_FLUSH"},
+    {FUSB302_CTL0_INT_MASK, "INT_MASK"},
+    {BIT(4), NULL},
+    {FUSB302_CTL0_HOST_CUR_MASK, "HOST_CUR"},
+    {FUSB302_CTL0_AUTO_PRE, "AUTO_PRE"},
+    {FUSB302_CTL0_TX_START, "TX_START"},
+};
+
+static const struct bit_name fusb302_control3_bits[] = {
+    {BIT(7), NULL},
+    {FUSB302_CTL3_SEND_HARD_RESET, "SEND_HARD_RESET"},
+    {FUSB302_CTL3_BIST_TMODE, "BIST_TMODE"},
+    {FUSB302_CTL3_AUTO_HARDRESET, "AUTO_HARDRESET"},
+    {FUSB302_CTL3_AUTO_SOFTRESET, "AUTO_SOFTRESET"},
+    {FUSB302_CTL3_NRETRIES_MASK, "NRETRIES"},
+    {FUSB302_CTL3_AUTO_RETRY, "AUTO_RETRY"},
 };
 
 #endif /* FUSB302_H */
