@@ -277,12 +277,34 @@ static void handle_command(char *line) {
         uint8_t val;
         fusb_read_reg(I2C1, reg, &val);
         print_byte_as_bits(val, reg);
-    } else if (line[0] == 's') {
-        // Setup FUSB302 as sniffer
-        fusb_setup_sniffer(I2C1);
-        printf("FUSB302 configured as PD sniffer\r\n");
+    } else if (line[0] == 'c') {
+        // Call a function by name
+        char *p = strtok(&line[1], " ");
+        if (!p) { printf("usage: c <function_name>\r\n"); return; }
+        if (strcmp(p, "fusb_measure_cc_pin_src") == 0) {
+            int cc1_lvl = fusb_measure_cc_pin_src(I2C1, FUSB302_SW0_MEAS_CC1);
+            int cc2_lvl = fusb_measure_cc_pin_src(I2C1, FUSB302_SW0_MEAS_CC2);
+            printf("CC1 level: %d, CC2 level: %d\r\n", cc1_lvl, cc2_lvl);
+        } else if (strcmp(p, "fusb_get_chip_id") == 0) {
+            uint8_t id = fusb_get_chip_id(I2C1);
+            printf("FUSB302 Chip ID (Reg: 0x01): 0x%02X\r\n", id);
+        } else if (strcmp(p, "fusb_reset") == 0) {
+            fusb_reset(I2C1);
+            printf("FUSB302 Reset (Reg: 0x0C) performed\r\n");
+        } else if (strcmp(p, "fusb_power_all") == 0) {
+            fusb_power_all(I2C1);
+            printf("FUSB302 Power (Reg: 0x0B) all on\r\n");
+        } else if (strcmp(p, "fusb_pd_reset") == 0) {
+            fusb_pd_reset(I2C1);
+            printf("FUSB302 PD Reset (Reg: 0x0C) performed\r\n");
+        } else if (strcmp(p, "fusb_setup_sniffer") == 0) {
+            fusb_setup_sniffer(I2C1);
+            printf("FUSB302 Sniffer mode setup done\r\n");
+        } else {
+            printf("Unknown function: %s\r\n", p);
+        }
     } else {
-        printf("Commands:\r\n  Read from register:\t\tr <reg>\r\n  Write to register:\t\tw <reg> <val>\r\n  Probe I2C addresses:\t\tp (probe)\r\n  Bulk read:\t\t\tb <reg>\r\n  Bulk write to register:\tn <reg> <val1> <val2> ...\r\n  Read bits in register:\tt <reg> \r\n  Setup sniffer:\t\ts \r\n");
+        printf("Commands:\r\n  Read from register:\t\tr <reg>\r\n  Write to register:\t\tw <reg> <val>\r\n  Probe I2C addresses:\t\tp (probe)\r\n  Bulk read:\t\t\tb <reg>\r\n  Bulk write to register:\tn <reg> <val1> <val2> ...\r\n  Read bits in register:\tt <reg> \r\n  Call function:\t\tc <name> \r\n");
     }
 }
 
