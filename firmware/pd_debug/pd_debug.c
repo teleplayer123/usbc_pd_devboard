@@ -242,7 +242,7 @@ static void handle_command(char *line) {
         fusb_setup_sniffer(I2C1);
         printf("FUSB302 configured as PD sniffer\r\n");
     } else {
-        printf("Commands:\r\n  Read from register:\t\tr <reg>\r\n  Write to register:\t\tw <reg> <val>\r\n  Probe I2C addresses:\t\tp (probe)\r\n  Bulk read:\t\tb <reg>\r\n  Bulk write to register:\t\tn <reg> <val1> <val2> ...\r\n  Read bits in register:\t\tt <reg> \r\n  Setup sniffer:\t\ts \r\n");
+        printf("Commands:\r\n  Read from register:\t\tr <reg>\r\n  Write to register:\t\tw <reg> <val>\r\n  Probe I2C addresses:\t\tp (probe)\r\n  Bulk read:\t\t\tb <reg>\r\n  Bulk write to register:\tn <reg> <val1> <val2> ...\r\n  Read bits in register:\tt <reg> \r\n  Setup sniffer:\t\ts \r\n");
     }
 }
 
