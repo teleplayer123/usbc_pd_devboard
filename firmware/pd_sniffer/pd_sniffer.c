@@ -337,8 +337,7 @@ int main(void) {
     uart_printf("\n--- FUSB302 PD Message Sniffer Started (UART) ---\n");
     uart_printf("Connect a PD Source/Sink to the USB-C receptacle.\n");
     uart_printf("I2C Address: 0x%02X\n", FUSB302_ADDR);
-    uart_printf("Press Enter to continue...\n");
-    usart_getc(); // pause for user visual confirmation
+
     // Configure FUSB302 for Sniffing
     fusb302_sniffer_setup();
     uart_printf("\nPress Enter to check for PD messages...\n");
@@ -346,21 +345,21 @@ int main(void) {
 
     // Main Loop: Wait for user input to check for PD messages
     while (1) {
-        // // Check CC lines for device connection
-        // int dev_detected = fusb302_check_cc_lines();
-        // if (dev_detected == 0) {
-        //     uart_printf("No device detected. Please connect a PD Source/Sink.\n");
-        //     uart_printf("Press Enter to retry...\n");
-        //     usart_getc(); // wait for user input
-        //     continue; // skip to next iteration
-        // }
+        // Check CC lines for device connection
+        int dev_detected = fusb302_check_cc_lines();
+        if (dev_detected == 0) {
+            uart_printf("No device detected. Please connect a PD Source/Sink.\n");
+            uart_printf("Press Enter to re-check CC lines...\n");
+            usart_getc();
+            continue; // skip to next iteration
+        }
 
         // Poll FIFO for any received PD messages
         fusb302_poll_fifo();
         check_and_read_fifo();
 
         // Delay to avoid busy looping
-        // fusb_delay_ms(1);
+        fusb_delay_ms(250);
     }
 
     return 0;
