@@ -121,6 +121,49 @@ static void fusb_init(void) {
     fusb_write_reg(FUSB302_REG_SWITCHES1, FUSB302_SW1_POWERROLE | FUSB302_SW1_AUTO_CRC | FUSB302_SW1_TXCC1);
 }
 
+// Helper to send a simple control message (Accept/Reject)
+static void fusb_send_control(uint8_t msg_type) {
+    uint16_t header = 0;
+    header |= (msg_type << 8);   // Control message type
+    header |= (2 << 6);          // Spec revision = 2
+    header |= (1 << 5);          // Power role = Source
+    header |= (0 << 12);         // No data objects
+
+    fusb_write_reg(FUSB302_REG_CONTROL0, FUSB302_CTL0_TX_FLUSH);
+
+    fusb_write_reg(FUSB302_REG_FIFOS, FUSB302_TX_TKN_SOP1);
+    fusb_write_reg(FUSB302_REG_FIFOS, FUSB302_TX_TKN_PACKSYM | 2); // header only
+    fusb_write_reg(FUSB302_REG_FIFOS, header & 0xFF);
+    fusb_write_reg(FUSB302_REG_FIFOS, (header >> 8) & 0xFF);
+    fusb_write_reg(FUSB302_REG_FIFOS, FUSB302_TX_TKN_JAMCRC);
+    fusb_write_reg(FUSB302_REG_FIFOS, FUSB302_TX_TKN_EOP);
+    fusb_write_reg(FUSB302_REG_FIFOS, FUSB302_TX_TKN_TXON);
+}
+
+// Handle Request message
+void handle_request(uint8_t *buf, int len) {
+    if (len < 6) return; // header + 1 data object
+
+    uint32_t req = buf[2] | (buf[3]<<8) | (buf[4]<<16) | (buf[5]<<24);
+    int obj_pos = (req >> 28) & 0x7;
+    int ma = (req & 0x3FF) * 10;
+    int mv = ((req >> 10) & 0x3FF) * 50;
+
+    char msg[80];
+    sprintf(msg, "Sink Request: PDO%d, %d mV, %d mA\r\n", obj_pos, mv, ma);
+    usart_print(msg);
+
+    // Example policy: accept only PDO1 (5V@3A) or PDO2 (9V@2A)
+    if ((obj_pos == 1 && mv == 5000 && ma <= 3000) ||
+        (obj_pos == 2 && mv == 9000 && ma <= 2000)) {
+        usart_print("Accepting request.\r\n");
+        fusb_send_control(3); // Accept
+    } else {
+        usart_print("Rejecting request.\r\n");
+        fusb_send_control(4); // Reject
+    }
+}
+
 // --- Peripheral Setup ---
 
 static void clock_setup(void) {
