@@ -167,23 +167,43 @@ static uint8_t fusb_get_chip_id(uint32_t i2c) {
     return id;
 }
 
-static void fusb_measure_cc_pin_src(uint32_t i2c, uint8_t cc_reg) {
+static int fusb_measure_cc_pin_src(uint32_t i2c, uint8_t cc_reg) {
     // Read status from switches0 register
-    uint8_t sw0, sw0_orig, cc_lvl;
-    fusb_read_reg(i2c, FUSB302_REG_SWITCHES0, &sw0);
-    sw0_orig = sw0;
+    uint8_t reg, sw0_orig, cc_lvl;
+    fusb_read_reg(i2c, FUSB302_REG_SWITCHES0, &reg);
+    sw0_orig = reg;
     // Clear measurement bits
-    sw0 &= ~(FUSB302_SW0_MEAS_CC1 | FUSB302_SW0_MEAS_CC2);
+    reg &= ~(FUSB302_SW0_MEAS_CC1 | FUSB302_SW0_MEAS_CC2);
     // Set measurement bit for desired CC pin
     if (cc_reg == FUSB302_SW0_MEAS_CC1) {
-        sw0 |= FUSB302_SW0_PU_EN1;  // Measure CC1
+        reg |= FUSB302_SW0_PU_EN1;  // Measure CC1
     } else if (cc_reg == FUSB302_SW0_MEAS_CC2) {
-        sw0 |= FUSB302_SW0_PU_EN2;  // Measure CC2
+        reg |= FUSB302_SW0_PU_EN2;  // Measure CC2
     }
     // Set CC measure bit
-    sw0 |= cc_reg;
+    reg |= cc_reg;
     // Set measurement switch
-    fusb_write_reg(i2c, FUSB302_REG_SWITCHES0, sw0);
+    fusb_write_reg(i2c, FUSB302_REG_SWITCHES0, reg);
+    // Set MDAC to default value
+    fusb_write_reg(i2c, FUSB302_REG_MEASURE, PD_SRC_DEF_MV);
+    fusb_delay_ms(250);
+    // Read status register
+    fusb_read_reg(i2c, FUSB302_REG_MEASURE, &reg);
+    // Assume open
+    cc_lvl = 0;
+    // CC voltage below no connect threshold
+    if ((reg & FUSB302_STATUS0_COMP) == 0) {
+        fusb_write_reg(i2c, FUSB302_REG_MEASURE, PD_SRC_DEF_RD_MV);
+        fusb_delay_ms(250);
+
+        // Read status register
+        fusb_read_reg(i2c, FUSB302_REG_MEASURE, &reg);
+
+        cc_lvl = (reg & FUSB302_STATUS0_COMP) ? TYPEC_CC_VOLT_RD : TYPEC_CC_VOLT_RA;
+    }
+    // Restore original switches0 register
+    fusb_write_reg(i2c, FUSB302_REG_SWITCHES0, sw0_orig);
+    return cc_lvl;
 }
 
 void fusb_setup_sniffer(uint32_t i2c) {

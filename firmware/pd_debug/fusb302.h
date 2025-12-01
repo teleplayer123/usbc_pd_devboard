@@ -259,6 +259,10 @@
 #define FUSB302_INT_BC_LVL          (1 << 0)
 
 #define BIT(x) (1 << (x))
+#define PD_SRC_DEF_MV               1600
+#define PD_SRC_DEF_RD_MV            200
+#define	TYPEC_CC_VOLT_RA            1
+#define	TYPEC_CC_VOLT_RD            2
 /* -----------------------------------------------------------
  * Tokens for FIFOS register
  * ----------------------------------------------------------- */
