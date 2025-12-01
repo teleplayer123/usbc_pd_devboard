@@ -189,13 +189,6 @@ static void fusb302_sniffer_setup(void) {
     i2c_write_reg(FUSB302_REG_SWITCHES0, res);
     fusb_delay_ms(10);
 
-    // Read CC
-    res = i2c_read_reg(FUSB302_REG_SWITCHES0);
-    clear_mask = ~(FUSB302_SW0_MEAS_CC1 | FUSB302_SW0_MEAS_CC2) & 0xFF;
-    res &= clear_mask;
-    res |= (FUSB302_SW0_MEAS_CC1 | FUSB302_SW0_MEAS_CC2);
-    i2c_write_reg(FUSB302_REG_SWITCHES0, res);
-
     // Enable SOP' and SOP''
     res = i2c_read_reg(FUSB302_REG_CONTROL1);
     res |= (FUSB302_CTL1_ENSOP1 | FUSB302_CTL1_ENSOP2 | FUSB302_CTL1_ENSOP1DB | FUSB302_CTL1_ENSOP2DB);
@@ -335,7 +328,7 @@ int main(void) {
 
     fusb_delay_ms(100); // Wait for stable power
     usart_getc(); // pause for user
-    
+
     uart_printf("\n--- FUSB302 PD Message Sniffer Started (UART) ---\n");
     uart_printf("Connect a PD Source/Sink to the USB-C receptacle.\n");
     uart_printf("I2C Address: 0x%02X\n", FUSB302_ADDR);
@@ -351,9 +344,8 @@ int main(void) {
         int dev_detected = fusb302_check_cc_lines();
         if (dev_detected == 0) {
             uart_printf("No device detected. Please connect a PD Source/Sink.\n");
-            uart_printf("Press Enter to re-check CC lines...\n");
-            usart_getc();
-            continue; // skip to next iteration
+        } else {
+            uart_printf("Device detected on CC%d. Monitoring for PD messages...\n", dev_detected);
         }
 
         // Poll FIFO for any received PD messages
