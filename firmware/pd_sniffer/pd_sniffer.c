@@ -328,16 +328,18 @@ static void i2c_setup(void) {
 // --- Main Program ---
 
 int main(void) {
-    
     // Setup Peripherals
     clock_setup();
     usart_setup();
     i2c_setup();
+
+    fusb_delay_ms(100); // Wait for stable power
+    usart_getc(); // pause for user
     
     uart_printf("\n--- FUSB302 PD Message Sniffer Started (UART) ---\n");
     uart_printf("Connect a PD Source/Sink to the USB-C receptacle.\n");
     uart_printf("I2C Address: 0x%02X\n", FUSB302_ADDR);
-
+    
     // Configure FUSB302 for Sniffing
     fusb302_sniffer_setup();
     uart_printf("\nPress Enter to check for PD messages...\n");
