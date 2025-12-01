@@ -20,7 +20,7 @@ static void clock_setup(void) {
 static void usart_setup(void) {
     gpio_mode_setup(GPIOA, GPIO_MODE_AF, GPIO_PUPD_NONE, GPIO2 | GPIO3);
     gpio_set_af(GPIOA, GPIO_AF1, GPIO2 | GPIO3);
-
+    // usart_disable(USART2);
     usart_set_baudrate(USART2, 115200);
     usart_set_databits(USART2, 8);
     usart_set_stopbits(USART2, USART_STOPBITS_1);
