@@ -1,9 +1,3 @@
-/**
- * FUSB302 USB PD Message Sniffer - UART Console Version
- * Target: STM32F072CB (using libopencm3)
- * Functions: UART Console, I2C, and FUSB302 configuration for PD Sniffing.
- */
-
 #include <libopencm3/stm32/rcc.h>
 #include <libopencm3/stm32/gpio.h>
 #include <libopencm3/stm32/i2c.h>
