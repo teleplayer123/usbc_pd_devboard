@@ -167,6 +167,25 @@ static uint8_t fusb_get_chip_id(uint32_t i2c) {
     return id;
 }
 
+static void fusb_measure_cc_pin_src(uint32_t i2c, uint8_t cc_reg) {
+    // Read status from switches0 register
+    uint8_t sw0, sw0_orig, cc_lvl;
+    fusb_read_reg(i2c, FUSB302_REG_SWITCHES0, &sw0);
+    sw0_orig = sw0;
+    // Clear measurement bits
+    sw0 &= ~(FUSB302_SW0_MEAS_CC1 | FUSB302_SW0_MEAS_CC2);
+    // Set measurement bit for desired CC pin
+    if (cc_reg == FUSB302_SW0_MEAS_CC1) {
+        sw0 |= FUSB302_SW0_PU_EN1;  // Measure CC1
+    } else if (cc_reg == FUSB302_SW0_MEAS_CC2) {
+        sw0 |= FUSB302_SW0_PU_EN2;  // Measure CC2
+    }
+    // Set CC measure bit
+    sw0 |= cc_reg;
+    // Set measurement switch
+    fusb_write_reg(i2c, FUSB302_REG_SWITCHES0, sw0);
+}
+
 void fusb_setup_sniffer(uint32_t i2c) {
     fusb_write_reg(i2c, FUSB302_REG_SWITCHES0,
         FUSB302_SW0_PU_EN2 |
