@@ -68,7 +68,7 @@ static void print_byte_as_bits(uint8_t byte, uint8_t reg) {
             printf("0");
         }
     }
-    printf("\n");
+    printf("\r\n");
 }
 
 void dump_bits(uint8_t reg, const struct bit_name *tbl)
