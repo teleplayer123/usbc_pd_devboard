@@ -57,8 +57,8 @@ static char usart_getc(void) {
     return usart_recv_blocking(USART2); 
 }
 
-static void print_byte_as_bits(uint8_t byte) {
-    printf("Reg %02X: ", byte);
+static void print_byte_as_bits(uint8_t byte, uint8_t reg) {
+    printf("Reg %02X: ", reg);
     for (int i = 7; i >= 0; i--) { // Loop from most significant bit (7) to least significant (0)
         // Use a bitwise AND with a mask to check if the current bit is set
         // The mask is 1 shifted left by 'i' positions
@@ -236,13 +236,13 @@ static void handle_command(char *line) {
         uint8_t reg = (uint8_t)strtol(&line[1], NULL, 0);
         uint8_t val;
         fusb_read_reg(I2C1, reg, &val);
-        print_byte_as_bits(val);
+        print_byte_as_bits(val, reg);
     } else if (line[0] == 's') {
         // Setup FUSB302 as sniffer
         fusb_setup_sniffer(I2C1);
         printf("FUSB302 configured as PD sniffer\r\n");
     } else {
-        printf("Commands:\r\n  r <reg>\r\n  w <reg> <val>\r\n  p (probe)\r\n  b <reg>\r\n  n <reg> <val1> <val2> ...\r\n  t <reg> (check register set bits)\r\n  s (setup sniffer)\r\n");
+        printf("Commands:\r\n  Read from register:  r <reg>\r\n  Write to register:  w <reg> <val>\r\n  Probe I2C addresses:  p (probe)\r\n  b <reg>\r\n  Bulk write to register:  n <reg> <val1> <val2> ...\r\n  Read bits in register:  t <reg> \r\n  Setup sniffer:  s \r\n");
     }
 }
 
