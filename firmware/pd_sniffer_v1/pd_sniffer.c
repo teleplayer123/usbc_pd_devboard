@@ -44,23 +44,36 @@ static uint8_t fusb302_read_reg(uint8_t reg) {
     return rx_val;
 }
 
-// Writes a single byte over UART2 (for logging)
-static void usart_send_byte(uint8_t data) {
-    usart_send_blocking(USART2, data);
+// Sends a single character over USART2 (blocking).
+static void usart_send_char(char c) {
+    usart_send_blocking(USART2, c);
 }
 
-// Writes a string over UART2
-static void usart_send_str(const char *str) {
-    while (*str) {
-        usart_send_byte(*str++);
+// Custom printf equivalent using USART2.
+static void usart_printf(const char *format, ...) {
+    char buf[128];
+    va_list args;
+    va_start(args, format);
+    vsnprintf(buf, sizeof(buf), format, args);
+    va_end(args);
+
+    for (const char *p = buf; *p; p++) {
+        usart_send_char(*p);
+        // Handle newline conversion for terminal compatibility
+        if (*p == '\n') {
+            usart_send_char('\r');
+        }
     }
 }
 
-// Writes a byte as a two-digit hexadecimal string (e.g., 0xAB -> "AB")
-static void usart_send_hex_byte(uint8_t byte) {
-    const char *hex = "0123456789ABCDEF";
-    usart_send_byte(hex[(byte >> 4) & 0xF]);
-    usart_send_byte(hex[byte & 0xF]);
+static void usart_hexdump(const uint8_t *data, size_t len) {
+    for (size_t i = 0; i < len; i++) {
+        usart_printf("%02X ", data[i]);
+        if ((i + 1) % 16 == 0) {
+            usart_printf("\n");
+        }
+    }
+    usart_printf("\n");
 }
 
 // ============================================================================
@@ -153,10 +166,10 @@ static void fusb302_reset(void) {
 static void fusb302_init(void) {
     // Read Device ID to confirm FUSB302 is alive
     if (fusb302_read_reg(FUSB302_REG_DEVICE_ID) != 0x91) {
-        usart_send_str("FUSB302 ID check failed (Expected 0x91).\r\n");
+        usart_printf("FUSB302 ID check failed (Expected 0x91).\r\n");
         // Fall through to try initialization anyway.
     } else {
-        usart_send_str("FUSB302 found (ID=0x09).\r\n");
+        usart_printf("FUSB302 found (0x91).\r\n");
     }
 
     // Perform full reset
@@ -168,8 +181,7 @@ static void fusb302_init(void) {
     
     // 2. Set up SWITCHES0: Enable PDWN1/PDWN2 (to listen)
     // Clear all PUs/VCONN/MEAS and just enable PDWN
-    fusb302_write_reg(FUSB302_REG_SWITCHES0, 
-        FUSB302_SW0_PDWN1 | FUSB302_SW0_PDWN2); 
+    fusb302_write_reg(FUSB302_REG_SWITCHES0, FUSB302_SW0_PDWN1 | FUSB302_SW0_PDWN2); 
     
     // 3. Set up SWITCHES1: Set DFP (Source) role and enable Auto CRC
     // This is a passive sniffer, so DRP mode is typically set via CONTROL2 toggle.
@@ -194,7 +206,7 @@ static void fusb302_init(void) {
     // MASK: Enable COMP_CHNG (Comparator Change) interrupt for CC detection
     fusb302_write_reg(FUSB302_REG_MASK, ~FUSB302_MASK_COMP_CHNG); // Clear mask for COMP_CHNG (Bit 5)
     
-    usart_send_str("FUSB302 configured for DRP/Sniffing.\r\n");
+    usart_printf("FUSB302 configured for DRP/Sniffing.\r\n");
 }
 
 static void fusb302_handle_rx_packet(void) {
@@ -203,7 +215,7 @@ static void fusb302_handle_rx_packet(void) {
     uint8_t len = 0;
     
     // Read the entire RX FIFO (starting at FUSB302_REG_FIFOS, 0x43)
-    usart_send_str("RX_PKT: ");
+    usart_printf("RX_PKT: ");
 
     // Read until RX_EMPTY (Status1 bit 5) is set
     while (!(fusb302_read_reg(FUSB302_REG_STATUS1) & FUSB302_STATUS1_RX_EMPTY)) {
@@ -213,16 +225,22 @@ static void fusb302_handle_rx_packet(void) {
         if (len < sizeof(rx_buf)) {
             rx_buf[len++] = rx_byte;
         }
-
         // Print byte as hex
-        usart_send_hex_byte(rx_byte);
-        usart_send_byte(' ');
+        usart_printf("%02X ", rx_byte);
     }
-    
+    usart_printf("\r\n");
+
     // Flush RX FIFO 
     fusb302_write_reg(FUSB302_REG_CONTROL1, FUSB302_CTL1_RX_FLUSH);
-    
-    usart_send_str("\r\n");
+
+    // Print hexdump of received packet
+    if (len > 0) {
+        usart_printf("RX Packet Length: %d bytes\r\n", len);
+        usart_printf("RX Packet Data:\r\n");
+        usart_hexdump(rx_buf, len);
+    } else {
+        usart_printf("RX Packet Length: 0 bytes\r\n");
+    }
 }
 
 // ============================================================================
@@ -239,7 +257,7 @@ void exti4_15_isr(void) {
 
         // --- Hard Reset Received / Sent ---
         if (int_a & FUSB302_INTA_HARDRST) {
-            usart_send_str("INT: Hard Reset Detected.\r\n");
+            usart_printf("INT: Hard Reset Detected.\r\n");
             // Hard Reset requires clearing state and re-toggling DRP.
             fusb302_reset();
         }
@@ -247,7 +265,7 @@ void exti4_15_isr(void) {
         // --- PD Packet Received ---
         // A received message is confirmed when GoodCRC is sent (GCRCSENT)
         if (int_b & FUSB302_INTB_GCRCSENT) {
-            usart_send_str("INT: GoodCRC Sent (Packet Received Confirmation).\r\n");
+            usart_printf("INT: GoodCRC Sent (Packet Received Confirmation).\r\n");
             // The packet is waiting in the FIFO
             fusb302_handle_rx_packet();
         }
@@ -256,14 +274,10 @@ void exti4_15_isr(void) {
         if (int_c & FUSB302_INT_COMP_CHNG) {
             uint8_t status0 = fusb302_read_reg(FUSB302_REG_STATUS0);
             uint8_t bc_lvl = (status0 & FUSB302_STATUS0_BC_LVL_MASK) >> FUSB302_STATUS0_BC_LVL_POS;
-            usart_send_str("INT: CC Change (BC_LVL=");
-            usart_send_hex_byte(bc_lvl);
-            usart_send_str("). Status0: ");
-            usart_send_hex_byte(status0);
-            usart_send_str("\r\n");
-            
-            // Re-configure the CC lines based on the detected level (if in DFP/UFP mode)
-            // For a passive sniffer, we mostly log the event and maintain DRP toggling.
+            usart_printf("INT: CC Change (BC_LVL=%02X). Status0: %02X", bc_lvl, status0);
+            /* Note:
+               Could re-configure the CC lines based on the detected level (if in DFP/UFP mode).
+               For a passive sniffer, we mostly log the event and maintain DRP toggling. */
         }
 
         // Clear the EXTI pending bit *after* handling the events
@@ -284,7 +298,7 @@ int main(void) {
     i2c_setup();
     exti_setup();
 
-    usart_send_str("\r\n--- PD Sniffer Starting ---\r\n");
+    usart_printf("\r\n--- PD Sniffer Starting ---\r\n");
 
     // 2. Initialize FUSB302
     fusb302_init();
