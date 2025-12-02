@@ -163,8 +163,7 @@ static void fusb302_init(void) {
     fusb302_reset();
 
     // 1. Power up all non-VCONN blocks (Bandgap, Rx/Tx, Measure, Internal Osc)
-    // We'll use FUSB302_POWER_ALL_ON from the user header, which is Bit 0-3.
-    // However, the FUSB302 requires setting Bits 0, 1, 2, 3 for full power.
+    // The FUSB302 requires setting Bits 0, 1, 2, 3 for full power.
     fusb302_write_reg(FUSB302_REG_POWER, FUSB302_POWER_ALL_ON);
     
     // 2. Set up SWITCHES0: Enable PDWN1/PDWN2 (to listen)
@@ -220,7 +219,7 @@ static void fusb302_handle_rx_packet(void) {
         usart_send_byte(' ');
     }
     
-    // Flush RX FIFO explicitly (optional but good practice)
+    // Flush RX FIFO 
     fusb302_write_reg(FUSB302_REG_CONTROL1, FUSB302_CTL1_RX_FLUSH);
     
     usart_send_str("\r\n");
@@ -285,7 +284,7 @@ int main(void) {
     i2c_setup();
     exti_setup();
 
-    usart_send_str("\r\n--- STM32F072 PD Sniffer Starting ---\r\n");
+    usart_send_str("\r\n--- PD Sniffer Starting ---\r\n");
 
     // 2. Initialize FUSB302
     fusb302_init();
