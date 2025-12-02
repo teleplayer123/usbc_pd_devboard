@@ -9,6 +9,9 @@
 #include <libopencm3/stm32/i2c.h>
 #include <libopencm3/stm32/usart.h>
 #include <libopencm3/cm3/nvic.h>
+#include <libopencm3/stm32/exti.h>
+#include <libopencm3/cm3/cortex.h>
+#include <libopencm3/cm3/systick.h>
 #include <stdio.h>
 #include <stdarg.h>
 #include <string.h>
@@ -34,7 +37,7 @@ static void usart_send_char(char c) {
 /**
  * @brief Custom printf equivalent using USART2.
  */
-static void uart_printf(const char *format, ...) {
+static void usart_printf(const char *format, ...) {
     char buf[128];
     va_list args;
     va_start(args, format);
@@ -56,16 +59,21 @@ static char usart_getc(void) {
 
 static void uart_hexdump(const uint8_t *data, size_t len) {
     for (size_t i = 0; i < len; i++) {
-        uart_printf("%02X ", data[i]);
+        usart_printf("%02X ", data[i]);
         if ((i + 1) % 16 == 0) {
-            uart_printf("\n");
+            usart_printf("\n");
         }
     }
-    uart_printf("\n");
+    usart_printf("\n");
 }
 
-void fusb_delay_ms(uint32_t ms) {
-    for (volatile uint32_t i=0; i<ms*4800; i++);
+// A simple delay function (blocking)
+static void delay_ms(uint32_t ms) {
+    // This assumes SysTick is running at 1ms intervals.
+    for (uint32_t i = 0; i < ms; i++) {
+        // Wait for the SysTick flag to be set (1ms elapsed)
+        while ((STK_CSR & STK_CSR_COUNTFLAG) == 0);
+    }
 }
 
 // --- I2C Communication Functions ---
@@ -114,29 +122,29 @@ static int fusb302_check_cc_lines(void) {
         /*BC_LVL is only defined when Measure block is on which is when
           register bits PWR[2]=1 and either MEAS_CC1=1 or MEAS_CC2=1*/
         uint8_t bc_lvl = status0 & FUSB302_STATUS0_BC_LVL_MASK;
-        uart_printf("Device detected on CC lines. BC_LVL: 0x%02X\n", bc_lvl);
+        usart_printf("Device detected on CC lines. BC_LVL: 0x%02X\n", bc_lvl);
 
         // Determine which CC line has the device
         // Measure CC1 only: MEAS_CC1=1, PU_EN1=1
         i2c_write_reg(FUSB302_REG_SWITCHES0, FUSB302_SW0_MEAS_CC1 | FUSB302_SW0_PU_EN1);
         status0 = i2c_read_reg(FUSB302_REG_STATUS0);
-        uart_printf("FUSB302 STATUS0 after CC1 measure: 0x%02X\n", status0);
+        usart_printf("FUSB302 STATUS0 after CC1 measure: 0x%02X\n", status0);
         uint8_t cc1_level = status0 & FUSB302_STATUS0_BC_LVL_MASK;
-        uart_printf("CC1 BC_LVL: 0x%02X\n", cc1_level);
+        usart_printf("CC1 BC_LVL: 0x%02X\n", cc1_level);
 
         // Measure CC2 only: MEAS_CC2=1, PU_EN2=1
         i2c_write_reg(FUSB302_REG_SWITCHES0, FUSB302_SW0_MEAS_CC2 | FUSB302_SW0_PU_EN2);
         status0 = i2c_read_reg(FUSB302_REG_STATUS0);
-        uart_printf("FUSB302 STATUS0 after CC2 measure: 0x%02X\n", status0);
+        usart_printf("FUSB302 STATUS0 after CC2 measure: 0x%02X\n", status0);
         uint8_t cc2_level = status0 & FUSB302_STATUS0_BC_LVL_MASK;
-        uart_printf("CC2 BC_LVL: 0x%02X\n", cc2_level);
+        usart_printf("CC2 BC_LVL: 0x%02X\n", cc2_level);
 
         // Configure for detected orientation
         if (cc1_level > 0x00 && cc2_level == 0x00) {
             // Return 1 for CC1
             ret = 1;
             // Device on CC1
-            uart_printf("Device detected on CC1. BC_LVL: 0x%02X\n", cc1_level);
+            usart_printf("Device detected on CC1. BC_LVL: 0x%02X\n", cc1_level);
             // PU_EN1=1, MEAS_CC1=1
             i2c_write_reg(FUSB302_REG_SWITCHES0, FUSB302_SW0_PU_EN1 | FUSB302_SW0_MEAS_CC1);
             // TXCC1=1, AUTO_CRC=1
@@ -145,14 +153,14 @@ static int fusb302_check_cc_lines(void) {
             // Return 2 for CC2
             ret = 2;
             // Device on CC2
-            uart_printf("Device detected on CC2. BC_LVL: 0x%02X\n", cc2_level);
+            usart_printf("Device detected on CC2. BC_LVL: 0x%02X\n", cc2_level);
             // PU_EN2=1, MEAS_CC2=1
             i2c_write_reg(FUSB302_REG_SWITCHES0, FUSB302_SW0_PU_EN2 | FUSB302_SW0_MEAS_CC2);
             // TXCC2=1, AUTO_CRC=1
             i2c_write_reg(FUSB302_REG_SWITCHES1, FUSB302_SW1_TXCC2 | FUSB302_SW1_AUTO_CRC);
         }
     } else {
-        uart_printf("No device detected on CC lines.\n");
+        usart_printf("No device detected on CC lines.\n");
         // Return 0 if no device detected
         ret = 0;
     }
@@ -162,11 +170,11 @@ static int fusb302_check_cc_lines(void) {
 static void fusb302_sniffer_setup(void) {
     uint8_t res, clear_mask;
     
-    uart_printf("Initializing FUSB302 for PD Sniffing...\n");
+    usart_printf("Initializing FUSB302 for PD Sniffing...\n");
     
     // Reset the FUSB302
     i2c_write_reg(FUSB302_REG_RESET, FUSB302_RESET_SW);
-    fusb_delay_ms(10);
+    delay_ms(10);
 
     // Power on
     i2c_write_reg(FUSB302_REG_POWER, FUSB302_POWER_ALL_ON);
@@ -187,7 +195,7 @@ static void fusb302_sniffer_setup(void) {
     clear_mask = ~(FUSB302_SW0_PDWN1 | FUSB302_SW0_PDWN2) & 0xFF;
     res &= clear_mask;
     i2c_write_reg(FUSB302_REG_SWITCHES0, res);
-    fusb_delay_ms(10);
+    delay_ms(10);
 
     // Enable SOP' and SOP''
     res = i2c_read_reg(FUSB302_REG_CONTROL1);
@@ -206,27 +214,27 @@ static void fusb302_sniffer_setup(void) {
 
     // Reset PD
     i2c_write_reg(FUSB302_REG_RESET, FUSB302_RESET_PD);
-    fusb_delay_ms(10);
+    delay_ms(10);
 
-    uart_printf("FUSB302 configured for PD Sniffing.\n");
+    usart_printf("FUSB302 configured for PD Sniffing.\n");
 }
 
 /**
  * @brief Checks FUSB302 status and reads any captured PD messages from the FIFO.
  */
 static void check_and_read_fifo(void) {
-    uart_printf("Checking for PD messages...\n");
+    usart_printf("Checking for PD messages...\n");
     // I_CRC_CHK bit in INTERRUPT register indicates a received PD message
     uint8_t interrupt = i2c_read_reg(FUSB302_REG_INTERRUPT);
     if (interrupt & FUSB302_INT_CRC_CHK) {
-        uart_printf("PD Message Received Interrupt Detected.\n");
+        usart_printf("PD Message Received Interrupt Detected.\n");
         // Read packet from RX FIFO
         // First byte is SOP token
         uint8_t token = i2c_read_reg(FUSB302_REG_FIFOS);
-        uart_printf("SOP Token: 0x%02X\n", token);
+        usart_printf("SOP Token: 0x%02X\n", token);
         uint8_t packet[32];
         uint8_t status1 = i2c_read_reg(FUSB302_REG_STATUS1);
-        uart_printf("FUSB302 STATUS1: 0x%02X\n", status1);
+        usart_printf("FUSB302 STATUS1: 0x%02X\n", status1);
         size_t index = 0;
 
         // While RX_EMPTY == 0
@@ -234,39 +242,38 @@ static void check_and_read_fifo(void) {
             packet[index++] = i2c_read_reg(FUSB302_REG_FIFOS);
             status1 = i2c_read_reg(FUSB302_REG_STATUS1);
         }
-        uart_printf("\n--- PD Message Captured ---\n");
+        usart_printf("\n--- PD Message Captured ---\n");
         uart_hexdump(packet, index);
     }
     // Try another method: check STATUS1 for RX_FULL
     // Read STATUS1 (0x41) to check RX_FULL bit (bit 4) and RX_EMPTY bit (bit 5)
     uint8_t status1 = i2c_read_reg(FUSB302_REG_STATUS1);
-    uart_printf("FUSB302 STATUS1: 0x%02X\n", status1);
+    usart_printf("FUSB302 STATUS1: 0x%02X\n", status1);
 
     // Check if the RX_FULL flag is set (PD message received)
     if (status1 & FUSB302_STATUS1_RX_FULL) {
-        uart_printf("\n--- PD Message Captured ---\n");
-        uart_printf("Raw FIFO Bytes (HEX): ");
+        usart_printf("\n--- PD Message Captured ---\n");
+        usart_printf("Raw FIFO Bytes (HEX): ");
 
         // Read all available bytes until RX_EMPTY is set.
         while (1) {
             uint8_t *buf = i2c_read_reg_fifo(FUSB302_REG_FIFOS);
-            uart_printf("--- Packet Hexdump ---\n");
+            usart_printf("--- Packet Hexdump ---\n");
             uart_hexdump(buf, 80);
 
             // Re-read STATUS0 to check for RX_EMPTY 
             if (i2c_read_reg(FUSB302_REG_STATUS1) & FUSB302_STATUS1_RX_EMPTY) {
-                uart_printf("Error reading STATUS1 during FIFO read.\n");
+                usart_printf("Error reading STATUS1 during FIFO read.\n");
                 break;
             }
         }
-        uart_printf("--- End of PD Message ---\n");
+        usart_printf("--- End of PD Message ---\n");
     }
 }
 
-// INT I2C Pin not connected by mistake, workaroud...
 static void fusb302_poll_fifo(void) {
     // Read all available bytes in bursts
-    uart_printf("Polling FIFO for PD messages...\n");
+    usart_printf("Polling FIFO for PD messages...\n");
     for (int i = 0; i < 5; i++) {
         uint8_t *buf = i2c_read_reg_fifo(FUSB302_REG_FIFOS);
         // Sum of values in buf to make sure not all zeros
@@ -275,13 +282,35 @@ static void fusb302_poll_fifo(void) {
             sum += buf[j];
         }
         if (sum > 0) {
-            uart_printf("--- Packet Hexdump %d ---\n", i);
+            usart_printf("--- Packet Hexdump %d ---\n", i);
             uart_hexdump(buf, 80);
         }
     }
 }
 
+static void fusb302_reset(void) {
+    // 1. Perform a Software Reset (clears state machines and FIFOs)
+    i2c_write_reg(FUSB302_REG_RESET, FUSB302_RESET_SW); 
+    delay_ms(2);
+    
+    // 2. Clear all masks to enable *all* interrupts initially (for debugging)
+    i2c_write_reg(FUSB302_REG_MASK, 0x00);
+    i2c_write_reg(FUSB302_REG_MASKA, 0x00);
+    i2c_write_reg(FUSB302_REG_MASKB, 0x00);
+    
+    // 3. Clear all pending interrupts by reading them
+    i2c_read_reg(FUSB302_REG_INTERRUPT);
+    i2c_read_reg(FUSB302_REG_INTERRUPTA);
+    i2c_read_reg(FUSB302_REG_INTERRUPTB);
+}
+
 // --- Peripheral Setup ---
+static void systick_setup(void) {
+    // Set SysTick to trigger every 1ms (48MHz / 1000 = 48000)
+    systick_set_reload(48000 - 1);
+    systick_set_clocksource(STK_CSR_CLKSOURCE_AHB); // Use AHB clock
+    systick_counter_enable();
+}
 
 static void clock_setup(void) {
     rcc_clock_setup_in_hsi_out_48mhz();
@@ -308,7 +337,7 @@ static void i2c_setup(void) {
     gpio_mode_setup(GPIOB, GPIO_MODE_AF, GPIO_PUPD_NONE, GPIO6 | GPIO7);
     gpio_set_output_options(GPIOB, GPIO_OTYPE_OD, GPIO_OSPEED_25MHZ, GPIO6 | GPIO7);
     gpio_set_af(GPIOB, GPIO_AF1, GPIO6 | GPIO7);
-
+    gpio_mode_setup(GPIOB, GPIO_MODE_INPUT, GPIO_PUPD_PULLUP, GPIO8);
     /* Hardware reset via RCC */
     rcc_peripheral_reset(&RCC_APB1RSTR, RCC_APB1RSTR_I2C1RST);
     rcc_peripheral_clear_reset(&RCC_APB1RSTR, RCC_APB1RSTR_I2C1RST);
@@ -318,24 +347,85 @@ static void i2c_setup(void) {
     i2c_peripheral_enable(I2C1);
 }
 
+static void exti_setup(void) {
+    // FUSB302 INT_N is connected to PB8
+    // We need to enable the clock for SYSCFG to configure EXTI.
+    rcc_periph_clock_enable(RCC_SYSCFG_COMP);
+    
+    // Map PB8 to EXTI8
+    exti_select_source(EXTI8, GPIOB);
+
+    // Set EXTI8 to trigger on a falling edge (INT_N is active-low)
+    exti_set_trigger(EXTI8, EXTI_TRIGGER_FALLING);
+
+    // Enable EXTI8 interrupt line
+    exti_enable_request(EXTI8);
+
+    /* Source Identification: Inside the EXTI4_15_IRQHandler function, you will 
+    need to check the specific pending register flag (PR register, bit 8) for EXTI 
+    line 8 to determine if it was the source of the interrupt, as lines 4 through 15 
+    all share this single handler */
+    nvic_enable_irq(NVIC_EXTI4_15_IRQ); 
+}
+
+// Handler for EXTI4_15_IRQ (handles PB8 interrupt)
+void exti4_15_isr(void) {
+    if (exti_get_flag_status(EXTI8)) {
+        // Read the Interrupt registers to see what happened and clear the interrupt.
+        uint8_t int_a = i2c_read_reg(FUSB302_REG_INTERRUPTA);
+        uint8_t int_b = i2c_read_reg(FUSB302_REG_INTERRUPTB);
+        uint8_t int_c = i2c_read_reg(FUSB302_REG_INTERRUPT);
+
+        // --- Hard Reset Received / Sent ---
+        if (int_a & FUSB302_INTA_HARDRST) {
+            usart_printf("INT: Hard Reset Detected.\r\n");
+            // Hard Reset requires clearing state and re-toggling DRP.
+            fusb302_reset();
+        }
+
+        // --- PD Packet Received ---
+        // A received message is confirmed when GoodCRC is sent (GCRCSENT)
+        if (int_b & FUSB302_INTB_GCRCSENT) {
+            usart_printf("INT: GoodCRC Sent (Packet Received Confirmation).\r\n");
+            // The packet is waiting in the FIFO
+            check_and_read_fifo();
+        }
+        
+        // --- CC Comparator Change ---
+        if (int_c & FUSB302_INT_COMP_CHNG) {
+            uint8_t status0 = i2c_read_reg(FUSB302_REG_STATUS0);
+            uint8_t bc_lvl = (status0 & FUSB302_STATUS0_BC_LVL_MASK) >> FUSB302_STATUS0_BC_LVL_POS;
+            usart_printf("INT: CC Change (BC_LVL=%02X). Status0: %02X", bc_lvl, status0);
+            /* Note:
+               Could re-configure the CC lines based on the detected level (if in DFP/UFP mode).
+               For a passive sniffer, we mostly log the event and maintain DRP toggling. */
+        }
+
+        // Clear the EXTI pending bit *after* handling the events
+        exti_reset_request(EXTI8); 
+    }
+}
+
 // --- Main Program ---
 
 int main(void) {
     // Setup Peripherals
     clock_setup();
+    systick_setup();
     usart_setup();
     i2c_setup();
+    exti_setup();
 
-    fusb_delay_ms(100); // Wait for stable power
+    delay_ms(100); // Wait for stable power
     usart_getc(); // pause for user
 
-    uart_printf("\n--- FUSB302 PD Message Sniffer Started (UART) ---\n");
-    uart_printf("Connect a PD Source/Sink to the USB-C receptacle.\n");
-    uart_printf("I2C Address: 0x%02X\n", FUSB302_ADDR);
+    usart_printf("\n--- FUSB302 PD Message Sniffer Started (UART) ---\n");
+    usart_printf("Connect a PD Source/Sink to the USB-C receptacle.\n");
+    usart_printf("I2C Address: 0x%02X\n", FUSB302_ADDR);
     
     // Configure FUSB302 for Sniffing
     fusb302_sniffer_setup();
-    uart_printf("\nPress Enter to check for PD messages...\n");
+    usart_printf("\nPress Enter to check for PD messages...\n");
     usart_getc(); // pause for user to plug in device
 
     // Main Loop: Wait for user input to check for PD messages
@@ -343,17 +433,15 @@ int main(void) {
         // Check CC lines for device connection
         int dev_detected = fusb302_check_cc_lines();
         if (dev_detected == 0) {
-            uart_printf("No device detected. Please connect a PD Source/Sink.\n");
+            usart_printf("No device detected. Please connect a PD Source/Sink.\n");
         } else {
-            uart_printf("Device detected on CC%d. Monitoring for PD messages...\n", dev_detected);
+            usart_printf("Device detected on CC%d. Monitoring for PD messages...\n", dev_detected);
         }
-
         // Poll FIFO for any received PD messages
         fusb302_poll_fifo();
-        check_and_read_fifo();
 
         // Delay to avoid busy looping
-        fusb_delay_ms(250);
+        delay_ms(500);
     }
 
     return 0;
