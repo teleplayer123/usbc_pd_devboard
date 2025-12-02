@@ -294,8 +294,6 @@ int main(void) {
     while (1) {
         // The main loop does very little; all PD traffic is handled in the 
         // EXTI interrupt service routine (ISR) driven by the FUSB302 INT_N pin.
-        // We can add a heartbeat LED here or check for other simple events.
-        gpio_toggle(GPIOA, GPIO5); // Assuming the typical PA5 LED heartbeat
         delay_ms(500);
     }
 
