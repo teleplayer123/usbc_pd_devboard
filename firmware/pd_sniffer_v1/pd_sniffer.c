@@ -152,10 +152,8 @@ static void fusb302_reset(void) {
 
 static void fusb302_init(void) {
     // Read Device ID to confirm FUSB302 is alive
-    if (fusb302_read_reg(FUSB302_REG_DEVICE_ID) != 0x09) {
-        // The header defines the registers from an older datasheet version (0x01) 
-        // which corresponds to FUSB302B (0x09 in the actual chip).
-        usart_send_str("FUSB302 ID check failed (Expected 0x09).\r\n");
+    if (fusb302_read_reg(FUSB302_REG_DEVICE_ID) != 0x91) {
+        usart_send_str("FUSB302 ID check failed (Expected 0x91).\r\n");
         // Fall through to try initialization anyway.
     } else {
         usart_send_str("FUSB302 found (ID=0x09).\r\n");
