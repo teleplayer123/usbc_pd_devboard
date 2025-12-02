@@ -6,6 +6,10 @@
 #include <libopencm3/cm3/nvic.h>
 #include <libopencm3/cm3/cortex.h>
 #include <libopencm3/cm3/systick.h>
+#include <stdarg.h>
+#include <stdio.h>
+#include <stdint.h>
+#include <string.h>
 
 #include "fusb302.h" 
 
