@@ -115,13 +115,13 @@ static void exti_setup(void) {
     // We need to enable the clock for SYSCFG to configure EXTI.
     rcc_periph_clock_enable(RCC_SYSCFG_COMP);
     
-    // Map PB8 to EXTI5
+    // Map PB8 to EXTI8
     exti_select_source(EXTI8, GPIOB);
 
-    // Set EXTI5 to trigger on a falling edge (INT_N is active-low)
+    // Set EXTI8 to trigger on a falling edge (INT_N is active-low)
     exti_set_trigger(EXTI8, EXTI_TRIGGER_FALLING);
 
-    // Enable EXTI5 interrupt line
+    // Enable EXTI8 interrupt line
     exti_enable_request(EXTI8);
 
     /* Source Identification: Inside the EXTI4_15_IRQHandler function, you will 
@@ -231,9 +231,9 @@ static void fusb302_handle_rx_packet(void) {
 // Interrupt Handler
 // ============================================================================
 
-// Handler for EXTI4_15_IRQ (handles PB5 interrupt)
+// Handler for EXTI4_15_IRQ (handles PB8 interrupt)
 void exti4_15_isr(void) {
-    if (exti_get_flag_status(EXTI5)) {
+    if (exti_get_flag_status(EXTI8)) {
         // Read the Interrupt registers to see what happened and clear the interrupt.
         uint8_t int_a = fusb302_read_reg(FUSB302_REG_INTERRUPTA);
         uint8_t int_b = fusb302_read_reg(FUSB302_REG_INTERRUPTB);
@@ -269,7 +269,7 @@ void exti4_15_isr(void) {
         }
 
         // Clear the EXTI pending bit *after* handling the events
-        exti_reset_request(EXTI5); 
+        exti_reset_request(EXTI8); 
     }
 }
 
