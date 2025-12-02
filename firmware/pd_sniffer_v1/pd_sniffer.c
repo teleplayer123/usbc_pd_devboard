@@ -7,7 +7,6 @@
 #include <libopencm3/cm3/cortex.h>
 #include <libopencm3/cm3/systick.h>
 
-// Include the user-provided FUSB302 register definitions
 #include "fusb302.h" 
 
 // ============================================================================
