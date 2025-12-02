@@ -81,7 +81,6 @@ static void clock_setup(void) {
     rcc_periph_clock_enable(RCC_GPIOB);
     rcc_periph_clock_enable(RCC_USART2);
     rcc_periph_clock_enable(RCC_I2C1);
-    rcc_periph_clock_enable(RCC_SYSTICK);
 }
 
 static void usart_setup(void) {
@@ -101,7 +100,7 @@ static void i2c_setup(void) {
     gpio_mode_setup(GPIOB, GPIO_MODE_AF, GPIO_PUPD_NONE, GPIO6 | GPIO7);
     gpio_set_output_options(GPIOB, GPIO_OTYPE_OD, GPIO_OSPEED_25MHZ, GPIO6 | GPIO7);
     gpio_set_af(GPIOB, GPIO_AF1, GPIO6 | GPIO7);
-
+    gpio_mode_setup(GPIOB, GPIO_MODE_INPUT, GPIO_PUPD_PULLUP, GPIO8);
     /* Hardware reset via RCC */
     rcc_peripheral_reset(&RCC_APB1RSTR, RCC_APB1RSTR_I2C1RST);
     rcc_peripheral_clear_reset(&RCC_APB1RSTR, RCC_APB1RSTR_I2C1RST);
@@ -112,21 +111,23 @@ static void i2c_setup(void) {
 }
 
 static void exti_setup(void) {
-    // FUSB302 INT_N is connected to PB5.
+    // FUSB302 INT_N is connected to PB8
     // We need to enable the clock for SYSCFG to configure EXTI.
-    rcc_periph_clock_enable(RCC_SYSCFG);
-
-    // Map PB5 to EXTI5
-    exti_select_source(EXTI5, GPIOB);
+    rcc_periph_clock_enable(RCC_SYSCFG_COMP);
+    
+    // Map PB8 to EXTI5
+    exti_select_source(EXTI8, GPIOB);
 
     // Set EXTI5 to trigger on a falling edge (INT_N is active-low)
-    exti_set_falling_trigger(EXTI5);
+    exti_set_trigger(EXTI8, EXTI_TRIGGER_FALLING);
 
     // Enable EXTI5 interrupt line
-    exti_enable_request(EXTI5);
+    exti_enable_request(EXTI8);
 
-    // Enable the EXTI4_15 interrupt in the NVIC
-    // Note: EXTI 5 falls under the EXTI4_15_IRQn handler.
+    /* Source Identification: Inside the EXTI4_15_IRQHandler function, you will 
+    need to check the specific pending register flag (PR register, bit 8) for EXTI 
+    line 8 to determine if it was the source of the interrupt, as lines 4 through 15 
+    all share this single handler */
     nvic_enable_irq(NVIC_EXTI4_15_IRQ); 
 }
 
