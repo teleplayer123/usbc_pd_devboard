@@ -26,7 +26,7 @@ static void delay_ms(uint32_t ms) {
     // This assumes SysTick is running at 1ms intervals.
     for (uint32_t i = 0; i < ms; i++) {
         // Wait for the SysTick flag to be set (1ms elapsed)
-        while ((STK_CTRL & STK_CTRL_COUNTFLAG) == 0);
+        while ((STK_CSR & STK_CSR_COUNTFLAG) == 0);
     }
 }
 
@@ -68,18 +68,6 @@ static void usart_send_hex_byte(uint8_t byte) {
 // Peripheral Initialization
 // ============================================================================
 
-static void clock_setup(void) {
-    // Set clock to 48MHz using internal HSI (for STM32F072)
-    rcc_clock_setup_in_hsi_48mhz_oss(); 
-
-    // Enable clocks for I2C1 (APB1), USART2 (APB1), GPIOA/GPIOB (AHB)
-    rcc_periph_clock_enable(RCC_I2C1);
-    rcc_periph_clock_enable(RCC_USART2);
-    rcc_periph_clock_enable(RCC_GPIOA);
-    rcc_periph_clock_enable(RCC_GPIOB);
-    rcc_periph_clock_enable(RCC_SYSTICK);
-}
-
 static void systick_setup(void) {
     // Set SysTick to trigger every 1ms (48MHz / 1000 = 48000)
     systick_set_reload(48000 - 1);
@@ -93,6 +81,7 @@ static void clock_setup(void) {
     rcc_periph_clock_enable(RCC_GPIOB);
     rcc_periph_clock_enable(RCC_USART2);
     rcc_periph_clock_enable(RCC_I2C1);
+    rcc_periph_clock_enable(RCC_SYSTICK);
 }
 
 static void usart_setup(void) {
