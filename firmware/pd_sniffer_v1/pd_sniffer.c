@@ -171,14 +171,16 @@ static void fusb302_init(void) {
     // Read Device ID to confirm FUSB302 is alive
     if (fusb302_read_reg(FUSB302_REG_DEVICE_ID) != 0x91) {
         usart_printf("FUSB302 ID check failed (Expected 0x91).\r\n");
+        delay_ms(5);
         // Fall through to try initialization anyway.
     } else {
         usart_printf("FUSB302 found (0x91).\r\n");
+        delay_ms(5);
     }
 
     // Perform full reset
     fusb302_reset();
-
+    delay_ms(5);
     // 1. Power up all non-VCONN blocks (Bandgap, Rx/Tx, Measure, Internal Osc)
     // The FUSB302 requires setting Bits 0, 1, 2, 3 for full power.
     fusb302_write_reg(FUSB302_REG_POWER, FUSB302_POWER_ALL_ON);
@@ -211,6 +213,7 @@ static void fusb302_init(void) {
     fusb302_write_reg(FUSB302_REG_MASK, ~FUSB302_MASK_COMP_CHNG); // Clear mask for COMP_CHNG (Bit 5)
     
     usart_printf("FUSB302 configured for DRP/Sniffing.\r\n");
+    delay_ms(10);
 }
 
 static void fusb302_handle_rx_packet(void) {
@@ -229,10 +232,7 @@ static void fusb302_handle_rx_packet(void) {
         if (len < sizeof(rx_buf)) {
             rx_buf[len++] = rx_byte;
         }
-        // Print byte as hex
-        usart_printf("%02X ", rx_byte);
     }
-    usart_printf("\r\n");
 
     // Flush RX FIFO 
     fusb302_write_reg(FUSB302_REG_CONTROL1, FUSB302_CTL1_RX_FLUSH);
@@ -242,6 +242,7 @@ static void fusb302_handle_rx_packet(void) {
         usart_printf("RX Packet Length: %d bytes\r\n", len);
         usart_printf("RX Packet Data:\r\n");
         usart_hexdump(rx_buf, len);
+        delay_ms(5);
     } else {
         usart_printf("RX Packet Length: 0 bytes\r\n");
     }
@@ -300,9 +301,13 @@ int main(void) {
     // 1. Initialize Peripherals
     usart_setup();
     i2c_setup();
+
+    // Avoid spamming the USART after exti_setup
+    usart_printf("\r\n--- PD Sniffer Starting ---\r\n");
+
     exti_setup();
 
-    usart_printf("\r\n--- PD Sniffer Starting ---\r\n");
+    
 
     // 2. Initialize FUSB302
     fusb302_init();
