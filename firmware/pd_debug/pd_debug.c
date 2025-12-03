@@ -2,6 +2,10 @@
 #include <libopencm3/stm32/gpio.h>
 #include <libopencm3/stm32/usart.h>
 #include <libopencm3/stm32/i2c.h>
+#include <libopencm3/stm32/exti.h>
+#include <libopencm3/cm3/nvic.h>
+#include <libopencm3/cm3/cortex.h>
+#include <libopencm3/cm3/systick.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -34,6 +38,7 @@ static void i2c_setup(void) {
     gpio_mode_setup(GPIOB, GPIO_MODE_AF, GPIO_PUPD_NONE, GPIO6 | GPIO7);
     gpio_set_output_options(GPIOB, GPIO_OTYPE_OD, GPIO_OSPEED_25MHZ, GPIO6 | GPIO7);
     gpio_set_af(GPIOB, GPIO_AF1, GPIO6 | GPIO7);
+    gpio_mode_setup(GPIOB, GPIO_MODE_INPUT, GPIO_PUPD_PULLUP, GPIO8);
 
     /* Hardware reset via RCC */
     rcc_peripheral_reset(&RCC_APB1RSTR, RCC_APB1RSTR_I2C1RST);
@@ -42,6 +47,34 @@ static void i2c_setup(void) {
     i2c_peripheral_disable(I2C1);
     i2c_set_speed(I2C1, i2c_speed_fm_400k, rcc_apb1_frequency / 1e6);
     i2c_peripheral_enable(I2C1);
+}
+
+static void systick_setup(void) {
+    // Set SysTick to trigger every 1ms (48MHz / 1000 = 48000)
+    systick_set_reload(48000 - 1);
+    systick_set_clocksource(STK_CSR_CLKSOURCE_AHB); // Use AHB clock
+    systick_counter_enable();
+}
+
+static void exti_setup(void) {
+    // FUSB302 INT_N is connected to PB8
+    // We need to enable the clock for SYSCFG to configure EXTI.
+    rcc_periph_clock_enable(RCC_SYSCFG_COMP);
+    
+    // Map PB8 to EXTI8
+    exti_select_source(EXTI8, GPIOB);
+
+    // Set EXTI8 to trigger on a falling edge (INT_N is active-low)
+    exti_set_trigger(EXTI8, EXTI_TRIGGER_FALLING);
+
+    // Enable EXTI8 interrupt line
+    exti_enable_request(EXTI8);
+
+    /* Source Identification: Inside the EXTI4_15_IRQHandler function, you will 
+    need to check the specific pending register flag (PR register, bit 8) for EXTI 
+    line 8 to determine if it was the source of the interrupt, as lines 4 through 15 
+    all share this single handler */
+    nvic_enable_irq(NVIC_EXTI4_15_IRQ); 
 }
 
 /*---- Helper/Essential Functions ----*/
@@ -310,8 +343,10 @@ static void handle_command(char *line) {
 
 int main(void) {
     clock_setup();
+    systick_setup();
     usart_setup();
     i2c_setup();
+    exti_setup();
     printf("\r\nFUSB302 I2C test\r\n> ");
 
     char line[32]; int pos=0;
