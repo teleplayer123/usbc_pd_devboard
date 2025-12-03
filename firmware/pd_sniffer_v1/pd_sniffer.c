@@ -307,8 +307,6 @@ int main(void) {
 
     exti_setup();
 
-    
-
     // 2. Initialize FUSB302
     fusb302_init();
 
