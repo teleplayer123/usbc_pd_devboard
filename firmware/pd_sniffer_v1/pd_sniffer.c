@@ -301,10 +301,6 @@ int main(void) {
     // 1. Initialize Peripherals
     usart_setup();
     i2c_setup();
-
-    // Avoid spamming the USART after exti_setup
-    usart_printf("\r\n--- PD Sniffer Starting ---\r\n");
-
     exti_setup();
 
     // 2. Initialize FUSB302
