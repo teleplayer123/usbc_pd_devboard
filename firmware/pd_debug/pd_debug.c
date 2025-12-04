@@ -222,7 +222,7 @@ static int fusb_measure_cc_pin_src(uint32_t i2c, uint8_t cc_reg) {
     fusb_write_reg(i2c, FUSB302_REG_MEASURE, mdac);
     fusb_delay_ms(250);
     // Read status register
-    fusb_read_reg(i2c, FUSB302_REG_MEASURE, &reg);
+    fusb_read_reg(i2c, FUSB302_REG_STATUS0, &reg);
     // Assume open
     cc_lvl = 0;
     // CC voltage below no connect threshold
@@ -231,7 +231,7 @@ static int fusb_measure_cc_pin_src(uint32_t i2c, uint8_t cc_reg) {
         fusb_delay_ms(250);
 
         // Read status register
-        fusb_read_reg(i2c, FUSB302_REG_MEASURE, &reg);
+        fusb_read_reg(i2c, FUSB302_REG_STATUS0, &reg);
 
         cc_lvl = (reg & FUSB302_STATUS0_COMP) ? TYPEC_CC_VOLT_RD : TYPEC_CC_VOLT_RA;
     }
