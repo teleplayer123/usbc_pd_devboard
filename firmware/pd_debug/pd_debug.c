@@ -430,7 +430,6 @@ int main(void) {
     clock_setup();
     usart_setup();
     i2c_setup();
-    usart_printf("\r\n---- FUSB302 Debugger ----\r\n> ");
 
     char line[32]; int pos=0;
     while (1) {
