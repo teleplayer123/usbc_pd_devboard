@@ -413,6 +413,8 @@ int main(void) {
     usart_setup();
     i2c_setup();
 
+    printf("---- PD Debugger ----\r\n");
+
     char line[32]; int pos=0;
     while (1) {
         char c = usart_getc();
