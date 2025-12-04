@@ -465,8 +465,8 @@ int main(void) {
     systick_setup();
     usart_setup();
     i2c_setup();
-    exti_setup();
-    printf("\r\nFUSB302 I2C test\r\n> ");
+    // exti_setup();
+    printf("\r\n---- FUSB302 Debugger ----\r\n> ");
 
     char line[32]; int pos=0;
     while (1) {
