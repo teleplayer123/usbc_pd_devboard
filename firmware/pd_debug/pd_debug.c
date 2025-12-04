@@ -379,7 +379,7 @@ static void handle_command(char *line) {
             buf[nbytes++] = (uint8_t)strtol(p, NULL, 0);
         }
         fusb_write_reg_nbytes(I2C1, reg, buf, nbytes);
-        printf("bulk wrote %u bytes to reg 0x%02X\r\n", (unsigned)nbytes, reg);
+        usart_printf("bulk wrote %u bytes to reg 0x%02X\r\n", (unsigned)nbytes, reg);
     } else if (line[0] == 't') {
         // Print bits set in register
         uint8_t reg = (uint8_t)strtol(&line[1], NULL, 0);
