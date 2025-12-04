@@ -80,6 +80,10 @@ static void usart_hexdump(const uint8_t *data, size_t len) {
     usart_printf("\n");
 }
 
+static char usart_getc(void) { 
+    return usart_recv_blocking(USART2); 
+}
+
 // ============================================================================
 // Peripheral Initialization
 // ============================================================================
@@ -297,6 +301,7 @@ int main(void) {
 
     // 1. Initialize Peripherals
     usart_setup();
+    usart_getc(); 
     i2c_setup();
     exti_setup();
 
