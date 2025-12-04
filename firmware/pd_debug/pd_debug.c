@@ -7,6 +7,7 @@
 #include <libopencm3/cm3/cortex.h>
 #include <libopencm3/cm3/systick.h>
 #include <stdio.h>
+#include <stdarg.h>
 #include <string.h>
 #include <stdlib.h>
 #include "fusb302.h"
@@ -88,6 +89,28 @@ int _write(int fd, char *ptr, int len) {
 
 static char usart_getc(void) { 
     return usart_recv_blocking(USART2); 
+}
+
+static void usart_send_char(char c) {
+    usart_send_blocking(USART2, c);
+}
+
+
+// Custom printf equivalent using USART2.
+static void usart_printf(const char *format, ...) {
+    char buf[128];
+    va_list args;
+    va_start(args, format);
+    vsnprintf(buf, sizeof(buf), format, args);
+    va_end(args);
+
+    for (const char *p = buf; *p; p++) {
+        usart_send_char(*p);
+        // Handle newline conversion for terminal compatibility
+        if (*p == '\n') {
+            usart_send_char('\r');
+        }
+    }
 }
 
 static void print_byte_as_bits(uint8_t byte, uint8_t reg) {
@@ -240,9 +263,10 @@ static int fusb_measure_cc_pin_src(uint32_t i2c, uint8_t cc_reg) {
     return cc_lvl;
 }
 
-static int fusb302_check_cc_lines(void) {
+static int fusb_check_cc_lines(int32_t i2c) {
     int ret = 0;
-    uint8_t status0 = i2c_read_reg(FUSB302_REG_STATUS0);
+    uint8_t status0;
+    fusb_read_reg(i2c, FUSB302_REG_STATUS0, &status0);
     if (status0 & FUSB302_STATUS0_COMP) { // COMP bit indicates something attached
         /*BC_LVL is only defined when Measure block is on which is when
           register bits PWR[2]=1 and either MEAS_CC1=1 or MEAS_CC2=1*/
@@ -251,15 +275,15 @@ static int fusb302_check_cc_lines(void) {
 
         // Determine which CC line has the device
         // Measure CC1 only: MEAS_CC1=1, PU_EN1=1
-        i2c_write_reg(FUSB302_REG_SWITCHES0, FUSB302_SW0_MEAS_CC1 | FUSB302_SW0_PU_EN1);
-        status0 = i2c_read_reg(FUSB302_REG_STATUS0);
+        fusb_write_reg(i2c, FUSB302_REG_SWITCHES0, FUSB302_SW0_MEAS_CC1 | FUSB302_SW0_PU_EN1);
+        fusb_read_reg(i2c, FUSB302_REG_STATUS0, &status0);
         usart_printf("FUSB302 STATUS0 after CC1 measure: 0x%02X\n", status0);
         uint8_t cc1_level = status0 & FUSB302_STATUS0_BC_LVL_MASK;
         usart_printf("CC1 BC_LVL: 0x%02X\n", cc1_level);
 
         // Measure CC2 only: MEAS_CC2=1, PU_EN2=1
-        i2c_write_reg(FUSB302_REG_SWITCHES0, FUSB302_SW0_MEAS_CC2 | FUSB302_SW0_PU_EN2);
-        status0 = i2c_read_reg(FUSB302_REG_STATUS0);
+        fusb_write_reg(i2c, FUSB302_REG_SWITCHES0, FUSB302_SW0_MEAS_CC2 | FUSB302_SW0_PU_EN2);
+        fusb_read_reg(i2c, FUSB302_REG_STATUS0, &status0);
         usart_printf("FUSB302 STATUS0 after CC2 measure: 0x%02X\n", status0);
         uint8_t cc2_level = status0 & FUSB302_STATUS0_BC_LVL_MASK;
         usart_printf("CC2 BC_LVL: 0x%02X\n", cc2_level);
@@ -271,18 +295,18 @@ static int fusb302_check_cc_lines(void) {
             // Device on CC1
             usart_printf("Device detected on CC1. BC_LVL: 0x%02X\n", cc1_level);
             // PU_EN1=1, MEAS_CC1=1
-            i2c_write_reg(FUSB302_REG_SWITCHES0, FUSB302_SW0_PU_EN1 | FUSB302_SW0_MEAS_CC1);
+            fusb_write_reg(i2c, FUSB302_REG_SWITCHES0, FUSB302_SW0_PU_EN1 | FUSB302_SW0_MEAS_CC1);
             // TXCC1=1, AUTO_CRC=1
-            i2c_write_reg(FUSB302_REG_SWITCHES1, FUSB302_SW1_TXCC1 | FUSB302_SW1_AUTO_CRC);
+            fusb_write_reg(i2c, FUSB302_REG_SWITCHES1, FUSB302_SW1_TXCC1 | FUSB302_SW1_AUTO_CRC);
         } else if (cc2_level > 0x00 && cc1_level == 0x00) {
             // Return 2 for CC2
             ret = 2;
             // Device on CC2
             usart_printf("Device detected on CC2. BC_LVL: 0x%02X\n", cc2_level);
             // PU_EN2=1, MEAS_CC2=1
-            i2c_write_reg(FUSB302_REG_SWITCHES0, FUSB302_SW0_PU_EN2 | FUSB302_SW0_MEAS_CC2);
+            fusb_write_reg(i2c, FUSB302_REG_SWITCHES0, FUSB302_SW0_PU_EN2 | FUSB302_SW0_MEAS_CC2);
             // TXCC2=1, AUTO_CRC=1
-            i2c_write_reg(FUSB302_REG_SWITCHES1, FUSB302_SW1_TXCC2 | FUSB302_SW1_AUTO_CRC);
+            fusb_write_reg(i2c, FUSB302_REG_SWITCHES1, FUSB302_SW1_TXCC2 | FUSB302_SW1_AUTO_CRC);
         }
     } else {
         usart_printf("No device detected on CC lines.\n");
@@ -292,54 +316,54 @@ static int fusb302_check_cc_lines(void) {
     return ret;
 }
 
-static void fusb302_setup_sniffer(void) {
+static void fusb_setup_sniffer(int32_t i2c) {
     uint8_t res, clear_mask;
     
     usart_printf("Initializing FUSB302 for PD Sniffing...\n");
     
     // Reset the FUSB302
-    i2c_write_reg(FUSB302_REG_RESET, FUSB302_RESET_SW);
-    delay_ms(10);
+    fusb_write_reg(i2c, FUSB302_REG_RESET, FUSB302_RESET_SW);
+    fusb_delay_ms(10);
 
     // Power on
-    i2c_write_reg(FUSB302_REG_POWER, FUSB302_POWER_ALL_ON);
+    fusb_write_reg(i2c, FUSB302_REG_POWER, FUSB302_POWER_ALL_ON);
 
     // Unmask all interrupts 
-    i2c_write_reg(FUSB302_REG_MASK, 0x00);
-    i2c_write_reg(FUSB302_REG_MASKA, 0x00);
-    i2c_write_reg(FUSB302_REG_MASKB, 0x00);
+    fusb_write_reg(i2c, FUSB302_REG_MASK, 0x00);
+    fusb_write_reg(i2c, FUSB302_REG_MASKA, 0x00);
+    fusb_write_reg(i2c, FUSB302_REG_MASKB, 0x00);
 
     // Configure listening mode
     // Flush RX
-    res = i2c_read_reg(FUSB302_REG_CONTROL1);
+    fusb_read_reg(i2c, FUSB302_REG_CONTROL1, &res);
     res |= FUSB302_CTL1_RX_FLUSH;
-    i2c_write_reg(FUSB302_REG_CONTROL1, res);
+    fusb_write_reg(i2c, FUSB302_REG_CONTROL1, res);
 
     // Disable pull-downs
-    res = i2c_read_reg(FUSB302_REG_SWITCHES0);
+    fusb_read_reg(i2c, FUSB302_REG_SWITCHES0, &res);
     clear_mask = ~(FUSB302_SW0_PDWN1 | FUSB302_SW0_PDWN2) & 0xFF;
     res &= clear_mask;
-    i2c_write_reg(FUSB302_REG_SWITCHES0, res);
-    delay_ms(10);
+    fusb_write_reg(i2c, FUSB302_REG_SWITCHES0, res);
+    fusb_delay_ms(10);
 
     // Enable SOP' and SOP''
-    res = i2c_read_reg(FUSB302_REG_CONTROL1);
+    fusb_read_reg(i2c, FUSB302_REG_CONTROL1, &res);
     res |= (FUSB302_CTL1_ENSOP1 | FUSB302_CTL1_ENSOP2 | FUSB302_CTL1_ENSOP1DB | FUSB302_CTL1_ENSOP2DB);
-    i2c_write_reg(FUSB302_REG_CONTROL1, res);
+    fusb_write_reg(i2c, FUSB302_REG_CONTROL1, res);
 
     // Flush TX
-    res = i2c_read_reg(FUSB302_REG_CONTROL0);
+    fusb_read_reg(i2c, FUSB302_REG_CONTROL0, &res);
     res |= FUSB302_CTL0_TX_FLUSH;
-    i2c_write_reg(FUSB302_REG_CONTROL0, res);
+    fusb_write_reg(i2c, FUSB302_REG_CONTROL0, res);
 
     // Flush RX again?
-    res = i2c_read_reg(FUSB302_REG_CONTROL1);
+    fusb_read_reg(i2c, FUSB302_REG_CONTROL1, &res);
     res |= FUSB302_CTL1_RX_FLUSH;
-    i2c_write_reg(FUSB302_REG_CONTROL1, res);
+    fusb_write_reg(i2c, FUSB302_REG_CONTROL1, res);
 
     // Reset PD
-    i2c_write_reg(FUSB302_REG_RESET, FUSB302_RESET_PD);
-    delay_ms(10);
+    fusb_write_reg(i2c, FUSB302_REG_RESET, FUSB302_RESET_PD);
+    fusb_delay_ms(10);
 
     usart_printf("FUSB302 configured for PD Sniffing.\n");
 }
@@ -405,7 +429,7 @@ static void handle_command(char *line) {
             int cc2_lvl = fusb_measure_cc_pin_src(I2C1, FUSB302_SW0_MEAS_CC2);
             printf("CC1 level: %d, CC2 level: %d\r\n", cc1_lvl, cc2_lvl);
         } else if (strcmp(p, "fusb_check_cc_lines") == 0) {
-            int ret = fusb302_check_cc_lines();
+            int ret = fusb_check_cc_lines(I2C1);
             if (ret == 1) {
                 printf("Device detected on CC1.\r\n");
             } else if (ret == 2) {
