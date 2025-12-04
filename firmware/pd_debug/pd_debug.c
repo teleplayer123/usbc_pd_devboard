@@ -404,6 +404,15 @@ static void handle_command(char *line) {
             int cc1_lvl = fusb_measure_cc_pin_src(I2C1, FUSB302_SW0_MEAS_CC1);
             int cc2_lvl = fusb_measure_cc_pin_src(I2C1, FUSB302_SW0_MEAS_CC2);
             printf("CC1 level: %d, CC2 level: %d\r\n", cc1_lvl, cc2_lvl);
+        } else if (strcmp(p, "fusb_check_cc_lines") == 0) {
+            int ret = fusb302_check_cc_lines();
+            if (ret == 1) {
+                printf("Device detected on CC1.\r\n");
+            } else if (ret == 2) {
+                printf("Device detected on CC2.\r\n");
+            } else {
+                printf("No device detected on CC lines.\r\n");
+            }
         } else if (strcmp(p, "fusb_get_chip_id") == 0) {
             uint8_t id = fusb_get_chip_id(I2C1);
             printf("FUSB302 Chip ID (Reg: 0x01): 0x%02X\r\n", id);
