@@ -62,18 +62,34 @@ static void usart_send_char(char c) {
     usart_send_blocking(USART2, c);
 }
 
+static void usart_printf(const char *format, ...) {
+    char buf[2048];
+    va_list args;
+    va_start(args, format);
+    vsnprintf(buf, sizeof(buf), format, args);
+    va_end(args);
+
+    for (const char *p = buf; *p; p++) {
+        usart_send_char(*p);
+        // Handle newline conversion for terminal compatibility
+        if (*p == '\n') {
+            usart_send_char('\r');
+        }
+    }
+}
+
 static void print_byte_as_bits(uint8_t byte, uint8_t reg) {
-    printf("Reg %02X: ", reg);
+    usart_printf("Reg %02X: ", reg);
     for (int i = 7; i >= 0; i--) { // Loop from most significant bit (7) to least significant (0)
         // Use a bitwise AND with a mask to check if the current bit is set
         // The mask is 1 shifted left by 'i' positions
         if ((byte >> i) & 1) { 
-            printf("1");
+            usart_printf("1");
         } else {
-            printf("0");
+            usart_printf("0");
         }
     }
-    printf("\r\n");
+    usart_printf("\r\n");
 }
 
 void dump_bits(uint8_t reg, const struct bit_name *tbl)
@@ -82,7 +98,7 @@ void dump_bits(uint8_t reg, const struct bit_name *tbl)
         if (tbl[i].name == NULL)
             continue;  // skip unused bits             
 
-        printf("%s = %d\n", tbl[i].name, !!(reg & tbl[i].mask));
+        usart_printf("%s = %d\n", tbl[i].name, !!(reg & tbl[i].mask));
     }
 }
 
@@ -220,29 +236,29 @@ static int fusb_check_cc_lines(int32_t i2c) {
         /*BC_LVL is only defined when Measure block is on which is when
           register bits PWR[2]=1 and either MEAS_CC1=1 or MEAS_CC2=1*/
         uint8_t bc_lvl = status0 & FUSB302_STATUS0_BC_LVL_MASK;
-        printf("Device detected on CC lines. BC_LVL: 0x%02X\n", bc_lvl);
+        usart_printf("Device detected on CC lines. BC_LVL: 0x%02X\n", bc_lvl);
 
         // Determine which CC line has the device
         // Measure CC1 only: MEAS_CC1=1, PU_EN1=1
         fusb_write_reg(i2c, FUSB302_REG_SWITCHES0, FUSB302_SW0_MEAS_CC1 | FUSB302_SW0_PU_EN1);
         fusb_read_reg(i2c, FUSB302_REG_STATUS0, &status0);
-        printf("FUSB302 STATUS0 after CC1 measure: 0x%02X\n", status0);
+        usart_printf("FUSB302 STATUS0 after CC1 measure: 0x%02X\n", status0);
         uint8_t cc1_level = status0 & FUSB302_STATUS0_BC_LVL_MASK;
-        printf("CC1 BC_LVL: 0x%02X\n", cc1_level);
+        usart_printf("CC1 BC_LVL: 0x%02X\n", cc1_level);
 
         // Measure CC2 only: MEAS_CC2=1, PU_EN2=1
         fusb_write_reg(i2c, FUSB302_REG_SWITCHES0, FUSB302_SW0_MEAS_CC2 | FUSB302_SW0_PU_EN2);
         fusb_read_reg(i2c, FUSB302_REG_STATUS0, &status0);
-        printf("FUSB302 STATUS0 after CC2 measure: 0x%02X\n", status0);
+        usart_printf("FUSB302 STATUS0 after CC2 measure: 0x%02X\n", status0);
         uint8_t cc2_level = status0 & FUSB302_STATUS0_BC_LVL_MASK;
-        printf("CC2 BC_LVL: 0x%02X\n", cc2_level);
+        usart_printf("CC2 BC_LVL: 0x%02X\n", cc2_level);
 
         // Configure for detected orientation
         if (cc1_level > 0x00 && cc2_level == 0x00) {
             // Return 1 for CC1
             ret = 1;
             // Device on CC1
-            printf("Device detected on CC1. BC_LVL: 0x%02X\n", cc1_level);
+            usart_printf("Device detected on CC1. BC_LVL: 0x%02X\n", cc1_level);
             // PU_EN1=1, MEAS_CC1=1
             fusb_write_reg(i2c, FUSB302_REG_SWITCHES0, FUSB302_SW0_PU_EN1 | FUSB302_SW0_MEAS_CC1);
             // TXCC1=1, AUTO_CRC=1
@@ -251,14 +267,14 @@ static int fusb_check_cc_lines(int32_t i2c) {
             // Return 2 for CC2
             ret = 2;
             // Device on CC2
-            printf("Device detected on CC2. BC_LVL: 0x%02X\n", cc2_level);
+            usart_printf("Device detected on CC2. BC_LVL: 0x%02X\n", cc2_level);
             // PU_EN2=1, MEAS_CC2=1
             fusb_write_reg(i2c, FUSB302_REG_SWITCHES0, FUSB302_SW0_PU_EN2 | FUSB302_SW0_MEAS_CC2);
             // TXCC2=1, AUTO_CRC=1
             fusb_write_reg(i2c, FUSB302_REG_SWITCHES1, FUSB302_SW1_TXCC2 | FUSB302_SW1_AUTO_CRC);
         }
     } else {
-        printf("No device detected on CC lines.\n");
+        usart_printf("No device detected on CC lines.\n");
         // Return 0 if no device detected
         ret = 0;
     }
@@ -268,7 +284,7 @@ static int fusb_check_cc_lines(int32_t i2c) {
 static void fusb_setup_sniffer(int32_t i2c) {
     uint8_t res, clear_mask;
     
-    printf("Initializing FUSB302 for PD Sniffing...\n");
+    usart_printf("Initializing FUSB302 for PD Sniffing...\n");
     
     // Reset the FUSB302
     fusb_write_reg(i2c, FUSB302_REG_RESET, FUSB302_RESET_SW);
@@ -314,7 +330,7 @@ static void fusb_setup_sniffer(int32_t i2c) {
     fusb_write_reg(i2c, FUSB302_REG_RESET, FUSB302_RESET_PD);
     fusb_delay_ms(10);
 
-    printf("FUSB302 configured for PD Sniffing.\n");
+    usart_printf("FUSB302 configured for PD Sniffing.\n");
 }
 
 /* CLI parser */
@@ -323,37 +339,37 @@ static void handle_command(char *line) {
         uint8_t reg = (uint8_t)strtol(&line[1], NULL, 0);
         uint8_t val;
         fusb_read_reg(I2C1, reg, &val);
-        printf("read[0x%02X] = 0x%02X\r\n", reg, val);
+        usart_printf("read[0x%02X] = 0x%02X\r\n", reg, val);
     } else if (line[0] == 'w') {
         char *p = strtok(&line[1], " ");
-        if (!p) { printf("usage: w <reg> <val>\r\n"); return; }
+        if (!p) { usart_printf("usage: w <reg> <val>\r\n"); return; }
         uint8_t reg = (uint8_t)strtol(p, NULL, 0);
         p = strtok(NULL, " ");
-        if (!p) { printf("usage: w <reg> <val>\r\n"); return; }
+        if (!p) { usart_printf("usage: w <reg> <val>\r\n"); return; }
         uint8_t val = (uint8_t)strtol(p, NULL, 0);
         fusb_write_reg(I2C1, reg, val);
-        printf("write[0x%02X] = 0x%02X\r\n", reg, val);
+        usart_printf("write[0x%02X] = 0x%02X\r\n", reg, val);
     } else if (line[0] == 'p') {
-        printf("Scanning I2C...\r\n");
+        usart_printf("Scanning I2C...\r\n");
         for (uint8_t addr=1; addr<0x7F; addr++) {
             if (i2c_probe_addr(I2C1, addr)) {
-                printf("Probed 0x%02X\r\n", addr);
+                usart_printf("Probed 0x%02X\r\n", addr);
             }
         }
     } else if (line[0] == 'b') {
         char *p = strtok(&line[1], " ");
-        if (!p) { printf("bulk read usage: b <reg>\r\n"); return; }
+        if (!p) { usart_printf("bulk read usage: b <reg>\r\n"); return; }
         uint8_t reg = (uint8_t)strtol(p, NULL, 0);
         size_t nbytes = 80;
         uint8_t buf[80]; 
         fusb_read_reg_nbytes(I2C1, reg, buf, nbytes);
-        printf("read[0x%02X] = ", reg);
+        usart_printf("read[0x%02X] = ", reg);
         for (int i=0; i<80; i++) {
-            printf("0x%02X ", buf[i]);
+            usart_printf("0x%02X ", buf[i]);
         }
     } else if (line[0] == 'n') {
         char *p = strtok(&line[1], " ");
-        if (!p) { printf("bulk write usage: n <reg> <val1> <val2> ...\r\n"); return; }
+        if (!p) { usart_printf("bulk write usage: n <reg> <val1> <val2> ...\r\n"); return; }
         uint8_t reg = (uint8_t)strtol(p, NULL, 0);
         uint8_t buf[40];
         size_t nbytes = 0;
@@ -361,7 +377,7 @@ static void handle_command(char *line) {
             buf[nbytes++] = (uint8_t)strtol(p, NULL, 0);
         }
         fusb_write_reg_nbytes(I2C1, reg, buf, nbytes);
-        printf("bulk wrote %u bytes to reg 0x%02X\r\n", (unsigned)nbytes, reg);
+        usart_printf("bulk wrote %u bytes to reg 0x%02X\r\n", (unsigned)nbytes, reg);
     } else if (line[0] == 't') {
         // Print bits set in register
         uint8_t reg = (uint8_t)strtol(&line[1], NULL, 0);
@@ -371,40 +387,40 @@ static void handle_command(char *line) {
     } else if (line[0] == 'c') {
         // Call a function by name
         char *p = strtok(&line[1], " ");
-        if (!p) { printf("usage: c <function_name>\r\n"); return; }
+        if (!p) { usart_printf("usage: c <function_name>\r\n"); return; }
         if (strcmp(p, "fusb_measure_cc_pin_src") == 0) {
             int cc1_lvl = fusb_measure_cc_pin_src(I2C1, FUSB302_SW0_MEAS_CC1);
             int cc2_lvl = fusb_measure_cc_pin_src(I2C1, FUSB302_SW0_MEAS_CC2);
-            printf("CC1 level: %d, CC2 level: %d\r\n", cc1_lvl, cc2_lvl);
+            usart_printf("CC1 level: %d, CC2 level: %d\r\n", cc1_lvl, cc2_lvl);
         } else if (strcmp(p, "fusb_check_cc_lines") == 0) {
             int ret = fusb_check_cc_lines(I2C1);
             if (ret == 1) {
-                printf("Device detected on CC1.\r\n");
+                usart_printf("Device detected on CC1.\r\n");
             } else if (ret == 2) {
-                printf("Device detected on CC2.\r\n");
+                usart_printf("Device detected on CC2.\r\n");
             } else {
-                printf("No device detected on CC lines.\r\n");
+                usart_printf("No device detected on CC lines.\r\n");
             }
         } else if (strcmp(p, "fusb_get_chip_id") == 0) {
             uint8_t id = fusb_get_chip_id(I2C1);
-            printf("FUSB302 Chip ID (Reg: 0x01): 0x%02X\r\n", id);
+            usart_printf("FUSB302 Chip ID (Reg: 0x01): 0x%02X\r\n", id);
         } else if (strcmp(p, "fusb_reset") == 0) {
             fusb_reset(I2C1);
-            printf("FUSB302 Reset (Reg: 0x0C) performed\r\n");
+            usart_printf("FUSB302 Reset (Reg: 0x0C) performed\r\n");
         } else if (strcmp(p, "fusb_power_all") == 0) {
             fusb_power_all(I2C1);
-            printf("FUSB302 Power (Reg: 0x0B) all on\r\n");
+            usart_printf("FUSB302 Power (Reg: 0x0B) all on\r\n");
         } else if (strcmp(p, "fusb_pd_reset") == 0) {
             fusb_pd_reset(I2C1);
-            printf("FUSB302 PD Reset (Reg: 0x0C) performed\r\n");
+            usart_printf("FUSB302 PD Reset (Reg: 0x0C) performed\r\n");
         } else if (strcmp(p, "fusb_setup_sniffer") == 0) {
             fusb_setup_sniffer(I2C1);
-            printf("FUSB302 Sniffer mode setup done\r\n");
+            usart_printf("FUSB302 Sniffer mode setup done\r\n");
         } else {
-            printf("Unknown function: %s\r\n", p);
+            usart_printf("Unknown function: %s\r\n", p);
         }
     } else {
-        printf("Commands:\r\n  Read from register:\t\tr <reg>\r\n  Write to register:\t\tw <reg> <val>\r\n  Probe I2C addresses:\t\tp (probe)\r\n  Bulk read:\t\t\tb <reg>\r\n  Bulk write to register:\tn <reg> <val1> <val2> ...\r\n  Read bits in register:\tt <reg> \r\n  Call function:\t\tc <name> \r\n");
+        usart_printf("Commands:\r\n  Read from register:\t\tr <reg>\r\n  Write to register:\t\tw <reg> <val>\r\n  Probe I2C addresses:\t\tp (probe)\r\n  Bulk read:\t\t\tb <reg>\r\n  Bulk write to register:\tn <reg> <val1> <val2> ...\r\n  Read bits in register:\tt <reg> \r\n  Call function:\t\tc <name> \r\n");
     }
 }
 
@@ -413,17 +429,18 @@ int main(void) {
     usart_setup();
     i2c_setup();
 
-    printf("---- PD Debugger ----\r\n");
+    usart_getc();
+    usart_printf("---- PD Debugger ----\r\n");
 
     char line[32]; int pos=0;
     while (1) {
         char c = usart_getc();
         if (c=='\r' || c=='\n') {
             line[pos]=0;
-            printf("\r\n");
+            usart_printf("\r\n");
             handle_command(line);
             pos=0;
-            printf("> ");
+            usart_printf("> ");
         } else if (pos < (int)sizeof(line)-1) {
             usart_send_blocking(USART2, c); /* echo */
             line[pos++]=c;
