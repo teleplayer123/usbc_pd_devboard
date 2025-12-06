@@ -269,6 +269,11 @@ static int fusb_measure_cc_pin_src(uint32_t i2c, uint8_t cc_reg) {
     return cc_lvl;
 }
 
+static void fusb_enable_gcrc(uint32_t i2c, bool enable) {
+    uint8_t reg;
+    fusb_read_reg(i2c, FUSB302_REG_SWITCHES1, &reg);
+}
+
 static int fusb_check_cc_lines(int32_t i2c) {
     int ret = 0;
     fusb_power_all(i2c);
