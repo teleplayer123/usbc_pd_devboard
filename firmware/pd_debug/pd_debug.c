@@ -271,6 +271,7 @@ static int fusb_measure_cc_pin_src(uint32_t i2c, uint8_t cc_reg) {
 
 static int fusb_check_cc_lines(int32_t i2c) {
     int ret = 0;
+    fusb_power_all(i2c);
     int cc1_lvl = fusb_measure_cc_pin_src(i2c, FUSB302_SW0_MEAS_CC1);
     int cc2_lvl = fusb_measure_cc_pin_src(i2c, FUSB302_SW0_MEAS_CC2);
     if (cc1_lvl != TYPEC_CC_VOLT_OPEN && cc2_lvl == TYPEC_CC_VOLT_OPEN) {
