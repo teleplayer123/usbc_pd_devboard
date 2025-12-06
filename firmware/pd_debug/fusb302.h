@@ -261,6 +261,7 @@
 #define BIT(x) (1 << (x))
 #define PD_SRC_DEF_MV               1600
 #define PD_SRC_DEF_RD_MV            200
+#define	TYPEC_CC_VOLT_OPEN          0
 #define	TYPEC_CC_VOLT_RA            1
 #define	TYPEC_CC_VOLT_RD            2
 /* -----------------------------------------------------------
