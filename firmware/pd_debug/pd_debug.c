@@ -193,19 +193,14 @@ static bool i2c_probe_addr(uint32_t i2c, uint8_t addr) {
     }
 }
 
-// A simple delay function (blocking)
-static void delay_ms(uint32_t ms) {
+/*---- FUSB302 functions ----*/
+
+static void fusb_delay_ms(uint32_t ms) {
     // This assumes SysTick is running at 1ms intervals.
     for (uint32_t i = 0; i < ms; i++) {
         // Wait for the SysTick flag to be set (1ms elapsed)
         while ((STK_CSR & STK_CSR_COUNTFLAG) == 0);
     }
-}
-
-/*---- FUSB302 functions ----*/
-
-static void fusb_delay_ms(uint32_t ms) {
-    for (volatile uint32_t i=0; i<ms*4800; i++);
 }
 
 static void fusb_reset(uint32_t i2c) {
@@ -271,7 +266,13 @@ static int fusb_measure_cc_pin_src(uint32_t i2c, uint8_t cc_reg) {
 
 static void fusb_enable_gcrc(uint32_t i2c, bool enable) {
     uint8_t reg;
+    // AUTO_GCRC is in SWITCHES1 register
     fusb_read_reg(i2c, FUSB302_REG_SWITCHES1, &reg);
+    if (enable) {
+        reg |= FUSB302_SW1_AUTO_GCRC;
+    } else {
+        reg &= ~FUSB302_SW1_AUTO_GCRC;
+    }
 }
 
 static int fusb_check_cc_lines(int32_t i2c) {
@@ -422,6 +423,12 @@ static void handle_command(char *line) {
         } else if (strcmp(p, "fusb_setup_sniffer") == 0) {
             fusb_setup_sniffer(I2C1);
             usart_printf("FUSB302 Sniffer mode setup done\r\n");
+        } else if (strcmp(p, "fusb_enable_gcrc") == 0) {
+            p = strtok(NULL, " ");
+            if (!p) { usart_printf("usage: c fusb_enable_gcrc <0|1>\r\n"); return; }
+            bool enable = (strcmp(p, "1") == 0);
+            fusb_enable_gcrc(I2C1, enable);
+            usart_printf("FUSB302 AUTO_GCRC %s\r\n", enable ? "enabled" : "disabled");
         } else {
             usart_printf("Unknown function: %s\r\n", p);
         }

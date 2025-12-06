@@ -56,7 +56,7 @@
 #define FUSB302_SW1_SPECREV1        (1 << 6)
 #define FUSB302_SW1_SPECREV0        (1 << 5)
 #define FUSB302_SW1_DATAROLE        (1 << 4)
-#define FUSB302_SW1_AUTO_CRC        (1 << 2)
+#define FUSB302_SW1_AUTO_GCRC        (1 << 2)
 #define FUSB302_SW1_TXCC2           (1 << 1)
 #define FUSB302_SW1_TXCC1           (1 << 0)
 
@@ -371,7 +371,7 @@ static const struct bit_name fusb302_switches1_bits[] = {
     {FUSB302_SW1_SPECREV0, "SPECREV0"},
     {FUSB302_SW1_DATAROLE, "DATAROLE"},
     {BIT(3), NULL},
-    {FUSB302_SW1_AUTO_CRC, "AUTO_CRC"},
+    {FUSB302_SW1_AUTO_GCRC, "AUTO_GCRC"},
     {FUSB302_SW1_TXCC2, "TXCC2"},
     {FUSB302_SW1_TXCC1, "TXCC1"},
 };
