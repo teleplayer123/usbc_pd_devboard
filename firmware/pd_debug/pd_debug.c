@@ -273,9 +273,9 @@ static int fusb_check_cc_lines(int32_t i2c) {
     int ret = 0;
     int cc1_lvl = fusb_measure_cc_pin_src(i2c, FUSB302_SW0_MEAS_CC1);
     int cc2_lvl = fusb_measure_cc_pin_src(i2c, FUSB302_SW0_MEAS_CC2);
-    if (cc1_lvl != TYPEC_CC_VOLT_OPEN) {
+    if (cc1_lvl != TYPEC_CC_VOLT_OPEN && cc2_lvl == TYPEC_CC_VOLT_OPEN) {
         ret = 1; // Device detected on CC1
-    } else if (cc2_lvl != TYPEC_CC_VOLT_OPEN) {
+    } else if (cc2_lvl != TYPEC_CC_VOLT_OPEN && cc1_lvl == TYPEC_CC_VOLT_OPEN) {
         ret = 2; // Device detected on CC2
     }
     return ret;
