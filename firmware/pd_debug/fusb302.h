@@ -258,6 +258,21 @@
 #define FUSB302_INT_COLLISION       (1 << 1)
 #define FUSB302_INT_BC_LVL          (1 << 0)
 
+/* -----------------------------------------------------------
+ * PD Macros
+ * ----------------------------------------------------------- */
+
+ // Maximum size of the RxFIFO in FUSB302 [1]
+#define FUSB302_RX_FIFO_SIZE 80
+
+// Maximum length of a standard PD Data Message (Header + 7 PDOs + CRC)
+#define MAX_PD_PACKET_SIZE (2 + 7*4 + 4) // Header + 7 Data Objects + CRC = 34 bytes
+
+// Utility to extract Message Type and Number of Data Objects from the 16-bit Header
+#define PD_HEADER_MESSAGE_TYPE(h) ((h) & 0x1F) // Bits 4:0 [2]
+#define PD_HEADER_NUM_DATA_OBJECTS(h) (((h) >> 12) & 0x07) // Bits 14:12 [3]
+#define PD_HEADER_EXTENDED(h) (((h) >> 15) & 0x01) // Bit 15 [4]
+
 #define BIT(x) (1 << (x))
 #define PD_SRC_DEF_MV               1600
 #define PD_SRC_DEF_RD_MV            200
