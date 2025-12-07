@@ -561,6 +561,20 @@ static void handle_command(char *line) {
             bool enable = (strcmp(p, "1") == 0);
             fusb_enable_gcrc(I2C1, enable);
             usart_printf("FUSB302 AUTO_GCRC %s\r\n", enable ? "enabled" : "disabled");
+        } else if (strcmp(p, "fusb_flush_rx") == 0) {
+            fusb_flush_rx(I2C1);
+            usart_printf("FUSB302 RX FIFO flushed\r\n");
+        } else if (strcmp(p, "fusb_flush_tx") == 0) {
+            fusb_flush_tx(I2C1);
+            usart_printf("FUSB302 TX FIFO flushed\r\n");
+        } else if (strcmp(p, "i2c_read_fifo") == 0) {
+            uint8_t buf[32];
+            i2c_read_fifo(buf, sizeof(buf));
+            usart_printf("I2C Read FIFO: ");
+            for (size_t i = 0; i < sizeof(buf); i++) {
+                usart_printf("0x%02X ", buf[i]);
+            }
+            usart_printf("\r\n");
         } else {
             usart_printf("Unknown function: %s\r\n", p);
         }
