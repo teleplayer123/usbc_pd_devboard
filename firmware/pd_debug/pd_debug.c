@@ -614,8 +614,10 @@ static void handle_command(char *line) {
         fusb_init_sink(I2C1);
         usart_printf("Monitoring for PD messages...\r\n");
         pd_msg_t m;
+        usart_printf("Press Enter to start...\r\n");
+        usart_getc();
         while (1) {
-            for (int i = 0; i < 5; i++) {
+            for (int i = 0; i < 5000; i++) {
                 if (read_pd_message(I2C1, &m)) {
                     handle_pd_message(&m);
                 }
