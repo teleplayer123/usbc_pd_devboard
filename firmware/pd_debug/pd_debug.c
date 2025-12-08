@@ -610,6 +610,24 @@ static void handle_command(char *line) {
         uint8_t val;
         fusb_read_reg(I2C1, reg, &val);
         print_byte_as_bits(val, reg);
+    } else if (line[0] == 'm') {
+        fusb_init_sink(I2C1);
+        usart_printf("Monitoring for PD messages...\r\n");
+        pd_msg_t m;
+        while (1) {
+            for (int i = 0; i < 5; i++) {
+                if (read_pd_message(I2C1, &m)) {
+                    handle_pd_message(&m);
+                }
+            }
+            usart_printf("Enter c to continue or anything else to quit...\r\n");
+            char c = usart_getc();
+            if (c == 'c') {
+                continue;
+            } else {
+                break;
+            }
+        }
     } else if (line[0] == 'c') {
         // Call a function by name
         char *p = strtok(&line[1], " ");
@@ -666,7 +684,7 @@ static void handle_command(char *line) {
             usart_printf("Unknown function: %s\r\n", p);
         }
     } else {
-        usart_printf("Commands:\r\n  Read from register:\t\tr <reg>\r\n  Write to register:\t\tw <reg> <val>\r\n  Probe I2C addresses:\t\tp (probe)\r\n  Bulk read:\t\t\tb <reg>\r\n  Bulk write to register:\tn <reg> <val1> <val2> ...\r\n  Read bits in register:\tt <reg> \r\n  Call function:\t\tc <name> \r\n");
+        usart_printf("Commands:\r\n  Read from register:\t\tr <reg>\r\n  Write to register:\t\tw <reg> <val>\r\n  Probe I2C addresses:\t\tp (probe)\r\n  Bulk read:\t\t\tb <reg>\r\n  Bulk write to register:\tn <reg> <val1> <val2> ...\r\n  Read bits in register:\tt <reg> \r\n  Call function:\t\tc <name> \r\n  Monitor messages:\t\tm  \r\n");
     }
 }
 
