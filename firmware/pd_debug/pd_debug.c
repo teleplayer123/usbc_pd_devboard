@@ -232,6 +232,11 @@ static void fusb_pd_reset(uint32_t i2c) {
     fusb_delay_ms(10);
 }
 
+static void fusb_full_reset(uint32_t i2c) {
+    fusb_write_reg(i2c, FUSB302_REG_RESET, FUSB302_RESET_SW | FUSB302_RESET_PD);
+    fusb_delay_ms(10);
+}
+
 static void fusb_power_all(uint32_t i2c) {
     fusb_write_reg(i2c, FUSB302_REG_POWER, FUSB302_POWER_ALL_ON);
     fusb_delay_ms(1);
@@ -323,6 +328,20 @@ static void fusb_flush_tx(uint32_t i2c) {
     fusb_write_reg(i2c, FUSB302_REG_CONTROL0, res);
 }
 
+static void fusb_init_sink(uint32_t i2c) {
+    // Reset FUSB302
+    fusb_full_reset(i2c);
+    // Power on all blocks
+    fusb_power_all(i2c);
+    // Auto-CRC, Use CC1 TX, Set Sink Role
+    uint8_t switches1 = FUSB302_SW1_AUTO_GCRC | FUSB302_SW1_SPECREV1 | FUSB302_SW1_SPECREV0;
+    fusb_write_reg(i2c, FUSB302_REG_SWITCHES1, switches1);
+    // Toggle to detect CC and establish UFP (Sink)
+    uint8_t control2 = FUSB302_CTL2_MODE_UFP | FUSB302_CTL2_WAKE_EN | FUSB302_CTL2_TOGGLE;
+    fusb_write_reg(i2c, FUSB302_REG_CONTROL2, control2);
+    usart_printf("FUSB302 initialized in Sink mode.\n");
+}
+
 static void fusb_setup_sniffer(int32_t i2c) {
     uint8_t res, clear_mask;
     
@@ -362,6 +381,74 @@ static void fusb_setup_sniffer(int32_t i2c) {
     fusb_delay_ms(200);
 
     usart_printf("FUSB302 configured for PD Sniffing.\n");
+}
+
+/* ---- PD Functions ----*/
+
+static bool read_pd_message(uint32_t i2c, pd_msg_t *msg) {
+    uint8_t fifo[40];
+    uint8_t val;
+    fusb_read_reg(i2c, FUSB302_REG_STATUS1, &val);
+    if (val & FUSB302_STATUS1_RX_EMPTY ) {
+        return false;
+    }
+    // Read SOP token
+    i2c_read_fifo(fifo, 4);
+    msg->header = fifo[2] | (fifo[3]<<8);
+    int count = PD_HEADER_NUM_DATA_OBJECTS(msg->header);
+    if (count > 0) {
+        i2c_read_fifo((uint8_t*)msg->obj, count*4);
+    }
+    fusb_flush_rx(i2c);
+    return true;
+}
+
+static void request_voltage(int mv, int ma){
+    uint16_t hdr = 0;
+    hdr |= (1<<6);    // Sink
+    hdr |= (1<<5);    // PD Rev 3.0
+    hdr |= (1<<4);    // Data = UFP
+    hdr |= 1<<12;     // 1 Data Object
+
+    uint32_t rdo = 0;
+    rdo |= (0<<28);    // Object position = 1st PDO
+    rdo |= ((ma/10)<<10);
+    rdo |= (mv/50)<<0;
+
+    uint8_t tx[20],i=0;
+    tx[i++] = FUSB302_TX_TKN_SOP1;
+    tx[i++] = FUSB302_TX_TKN_PACKSYM | 2; tx[i++]=hdr&0xff; tx[i++]=hdr>>8;
+    tx[i++] = FUSB302_TX_TKN_PACKSYM | 4;
+    memcpy(&tx[i],&rdo,4); i+=4;
+    tx[i++] = FUSB302_TX_TKN_JAMCRC;
+    tx[i++] = FUSB302_TX_TKN_EOP;
+    tx[i++] = FUSB302_TX_TKN_TXOFF;
+    tx[i++] = FUSB302_TX_TKN_TXON;
+
+    uint8_t reg=FUSB302_REG_FIFOS;
+    i2c_transfer7(I2C1, FUSB302_ADDR, &reg, 1, tx, i);
+    fusb_write_reg(I2C1, FUSB302_REG_CONTROL0, FUSB302_CTL0_TX_START);
+
+    usart_printf("PD REQUEST sent: %dmV %dmA\n",mv,ma);
+}
+
+static void handle_pd_message(pd_msg_t *p){
+    uint8_t type = PD_HEADER_MESSAGE_TYPE(p->header);
+
+    if(type==1){ // Source Capabilities
+        int cnt=PD_HEADER_NUM_DATA_OBJECTS(p->header);
+        usart_printf("SOURCE_CAPS: %d PDOs\n",cnt);
+        for(int i=0;i<cnt;i++){
+            uint32_t obj=p->obj[i];
+            int mv=((obj>>10)&0x3FF)*50;
+            int ma=(obj&0x3FF)*10;
+            printf(" PDO%d: %d mV  %d mA\n",i+1,mv,ma);
+        }
+        // request first profile automatically (5V normally)
+        request_voltage(5000,3000);
+    }
+    else if(type==3) usart_printf(" ACCEPT\n");
+    else if(type==6) usart_printf(" PS_RDY -> negotiation complete!\n");
 }
 
 /* ---- Interrupt Handling and Decoding Logic ---- */
