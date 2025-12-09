@@ -614,7 +614,6 @@ int main(void) {
     clock_setup();
     systick_setup();
     usart_setup();
-    usart_getc(); // Wait for user
     i2c_setup();
     exti_setup();
     fusb_init_sink(I2C1); // Initially setup as a sink                
