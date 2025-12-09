@@ -585,7 +585,7 @@ void exti4_15_isr(void) {
 }
 
 static void check_rx_buffer(void) {
-
+    hexdump(rx_buffer, MAX_PD_PACKET_SIZE);
 }
 
 /* ---- CLI parser ---- */
@@ -711,6 +711,8 @@ static void handle_command(char *line) {
                 usart_printf("0x%02X ", buf[i]);
             }
             usart_printf("\r\n");
+        } else if (strcmp(p, "check_rx_buffer") == 0) {
+            check_rx_buffer();
         } else {
             usart_printf("Unknown function: %s\r\n", p);
         }
