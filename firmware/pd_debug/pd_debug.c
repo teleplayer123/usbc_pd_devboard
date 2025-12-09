@@ -14,6 +14,8 @@
 
 // Buffer to store the raw packet data
 uint8_t rx_buffer[MAX_PD_PACKET_SIZE];
+// Status flag for exti handler
+volatile bool fusb_event_pending = false;
 
 /*---- MCU setup functions ----*/
 
@@ -82,7 +84,7 @@ static void exti_setup(void) {
     nvic_enable_irq(NVIC_EXTI4_15_IRQ); 
 }
 
-/*---- Helper/Essential Functions ----*/
+/*---- UART Functions ----*/
 
 /* simple blocking getchar/putchar */
 int _write(int fd, char *ptr, int len) {
@@ -163,6 +165,10 @@ static void hexdump(const uint8_t *data, size_t len) {
     }
 }
 
+static bool uart_rx_ready(void) {
+    return usart_get_flag(USART2, USART_FLAG_RXNE);  // RX buffer not empty
+}
+
 /*---- I2C functions ----*/
 /*
 void i2c_transfer7(uint32_t i2c, uint8_t addr, const uint8_t *w, size_t wn, uint8_t *r, size_t rn);
@@ -192,6 +198,11 @@ static void fusb_write_reg_nbytes(uint32_t i2c, uint8_t reg, const uint8_t *buf,
     wbuf[0] = reg;
     memcpy(&wbuf[1], buf, nbytes);
     i2c_transfer7(i2c, FUSB302_ADDR, wbuf, 1 + nbytes, NULL, 0);
+}
+
+static void fusb_read_fifo(uint8_t *data, size_t len) {
+    uint8_t reg = FUSB302_REG_FIFOS;
+    i2c_transfer7(I2C1, FUSB302_ADDR, &reg, 1, data, len);
 }
 
 /* low level i2c scan */
@@ -232,12 +243,6 @@ static void i2c_write_reg(uint8_t reg, uint8_t val) {
     uint8_t tx_buf[2] = {reg, val};
     i2c_transfer7(I2C1, FUSB302_ADDR, tx_buf, 2, NULL, 0);
 }
-
-static void i2c_read_fifo(uint8_t *data, size_t len) {
-    uint8_t reg = FUSB302_REG_FIFOS;
-    i2c_transfer7(I2C1, FUSB302_ADDR, &reg, 1, data, len);
-}
-
 
 /*---- FUSB302 functions ----*/
 
@@ -410,23 +415,26 @@ static void fusb_setup_sniffer(int32_t i2c) {
     usart_printf("FUSB302 configured for PD Sniffing.\n");
 }
 
+static bool fusb_rx_empty(void) {
+    return (i2c_read_reg(FUSB302_REG_STATUS1) & FUSB302_STATUS1_RX_EMPTY);
+}
+
 /* ---- PD Functions ----*/
 
-static bool read_pd_message(uint32_t i2c, pd_msg_t *msg) {
-    uint8_t fifo[40];
-    uint8_t val;
-    fusb_read_reg(i2c, FUSB302_REG_STATUS1, &val);
-    if (val & FUSB302_STATUS1_RX_EMPTY ) {
-        return false;
-    }
-    // Read SOP token
-    i2c_read_fifo(fifo, 4);
-    msg->header = fifo[2] | (fifo[3]<<8);
-    int count = PD_HEADER_NUM_DATA_OBJECTS(msg->header);
-    if (count > 0) {
-        i2c_read_fifo((uint8_t*)msg->obj, count*4);
-    }
-    fusb_flush_rx(i2c);
+bool read_pd_message(pd_msg_t *pd)
+{
+    if (fusb_rx_empty()) return false;
+
+    uint8_t header[4];
+    fusb_read_fifo(header, 4);
+    pd->header = header[2] | (header[3] << 8);
+
+    int count = PD_HEADER_NUM_DATA_OBJECTS(pd->header);
+    if (count > 0)
+        fusb_read_fifo((uint8_t*)pd->obj, count * 4);
+
+    i2c_write_reg(FUSB302_REG_CONTROL1, FUSB302_CTL1_RX_FLUSH); // clear FIFO
+
     return true;
 }
 
@@ -481,107 +489,8 @@ static void handle_pd_message(pd_msg_t *p){
 /* ---- Interrupt Handling and Decoding Logic ---- */
 
 void exti4_15_isr(void) {
-    // Check if the interrupt is from EXTI line 8 (PB8)
-    if (exti_get_flag_status(EXTI8)) {
-        
-        // Reading Interrupt register clears the interrupt condition on FUSB302
-        uint8_t irq_status = i2c_read_reg(FUSB302_REG_INTERRUPT); 
-        uint8_t status1 = i2c_read_reg(FUSB302_REG_STATUS1);
-        
-        if (irq_status & FUSB302_INT_CRC_CHK) { // Valid packet received
-            
-            if (status1 & FUSB302_STATUS1_RX_EMPTY) {
-                // Should not happen if CRC_CHK is set, but check anyway
-                usart_printf("IRQ triggered but FIFO empty.\r\n");
-                goto end_irq;
-            }
-
-            // --- Read SOP Token ---
-            // SOP token is the first byte in FIFO [27]
-            uint8_t sop_token = i2c_read_reg(FUSB302_REG_FIFOS); 
-            rx_buffer[0] = sop_token;
-            size_t bytes_read = 1;
-            
-            // --- Read Message Header (2 bytes) ---
-            i2c_read_fifo(&rx_buffer[bytes_read], 2);
-            uint16_t header = (uint16_t)rx_buffer[bytes_read] | (uint16_t)(rx_buffer[bytes_read + 1] << 8);
-            bytes_read += 2;
-            
-            size_t payload_words = 0;
-            size_t total_data_bytes = 0;
-            const char* packet_type_str = "CTRL";
-
-            if (PD_HEADER_EXTENDED(header)) {
-                // --- Extended Message --- 
-                packet_type_str = "EXTD";
-                
-                // Read Extended Message Header (2 bytes)
-                i2c_read_fifo(&rx_buffer[bytes_read], 2);
-                uint16_t ext_header = (uint16_t)rx_buffer[bytes_read] | (uint16_t)(rx_buffer[bytes_read + 1] << 8);
-                bytes_read += 2;
-                
-                // Data Size (B8:0) tells total payload size in bytes
-                uint16_t data_size = ext_header & 0x01FF; 
-                total_data_bytes = data_size;
-                
-                // The actual payload data might be padded. For sniffing, read payload bytes.
-                // Payload must be read as multiple of 4 bytes (Data Objects) 
-                // up to MaxExtendedMsgLegacyLen (26 bytes, if chunking is involved)
-                // For simplicity, we assume reading the full length specified by Data Size + CRC (4 bytes)
-                size_t remaining_bytes_to_read = total_data_bytes + 4; // Data + CRC
-                
-                // Safely clamp remaining read length to avoid buffer overflow
-                if (bytes_read + remaining_bytes_to_read > MAX_PD_PACKET_SIZE) {
-                    remaining_bytes_to_read = MAX_PD_PACKET_SIZE - bytes_read;
-                }
-                
-                i2c_read_fifo(&rx_buffer[bytes_read], remaining_bytes_to_read);
-                bytes_read += remaining_bytes_to_read;
-                
-            } else {
-                // --- Control or Data Message ---
-                payload_words = PD_HEADER_NUM_DATA_OBJECTS(header);
-                total_data_bytes = payload_words * 4; // 1 Data Object = 4 bytes
-                
-                if (payload_words > 0) {
-                    packet_type_str = "DATA";
-                }
-                
-                size_t total_payload_plus_crc = total_data_bytes + 4; // CRC is 4 bytes
-                size_t remaining_bytes_to_read = total_payload_plus_crc;
-
-                // Safely clamp remaining read length
-                if (bytes_read + remaining_bytes_to_read > MAX_PD_PACKET_SIZE) {
-                    remaining_bytes_to_read = MAX_PD_PACKET_SIZE - bytes_read;
-                }
-                
-                i2c_read_fifo(&rx_buffer[bytes_read], remaining_bytes_to_read);
-                bytes_read += remaining_bytes_to_read;
-            }
-            
-            // --- Log Output ---
-            usart_printf("--- PD PACKET SNIFFED ---\r\n");
-            usart_printf("Type: %s (DOs: %d) | Total Bytes: %d\r\n", packet_type_str, (int)payload_words, (int)bytes_read);
-            
-            // Print raw buffer content (assuming logging capability exists)
-            for (size_t i = 0; i < bytes_read; i++) {
-                usart_printf("%02X ", rx_buffer[i]);
-                if (i % 16 == 15) usart_printf("\r\n");
-            }
-            usart_printf("\r\n-------------------------\r\n");
-            
-            // Flush RxFIFO completely if necessary (optional reset command)
-            // i2c_write_reg(FUSB302_REG_CONTROL1, FUSB302_CTL1_RX_FLUSH); 
-            
-        } else if (irq_status & FUSB302_INT_ACTIVITY) {
-            // Log CC activity if CRC_CHK wasn't set, might indicate noise or invalid frame
-            usart_printf("CC Activity Detected (Non-CRC event).\r\n");
-        }
-
-        end_irq:
-            // Clear the pending EXTI interrupt flag
-            exti_reset_request(EXTI8);
-    }
+    exti_reset_request(EXTI8);  // clear interrupt flag
+    fusb_event_pending = true;  // signal main loop to handle PD
 }
 
 static void check_rx_buffer(void) {
@@ -639,26 +548,6 @@ static void handle_command(char *line) {
         uint8_t val;
         fusb_read_reg(I2C1, reg, &val);
         print_byte_as_bits(val, reg);
-    } else if (line[0] == 'm') {
-        fusb_init_sink(I2C1);
-        usart_printf("Monitoring for PD messages...\r\n");
-        pd_msg_t m;
-        usart_printf("Press Enter to start...\r\n");
-        usart_getc();
-        while (1) {
-            for (int i = 0; i < 5000; i++) {
-                if (read_pd_message(I2C1, &m)) {
-                    handle_pd_message(&m);
-                }
-            }
-            usart_printf("Enter c to continue or anything else to quit...\r\n");
-            char c = usart_getc();
-            if (c == 'c') {
-                continue;
-            } else {
-                break;
-            }
-        }
     } else if (line[0] == 'c') {
         // Call a function by name
         char *p = strtok(&line[1], " ");
@@ -705,7 +594,7 @@ static void handle_command(char *line) {
             usart_printf("FUSB302 TX FIFO flushed\r\n");
         } else if (strcmp(p, "i2c_read_fifo") == 0) {
             uint8_t buf[32];
-            i2c_read_fifo(buf, sizeof(buf));
+            fusb_read_fifo(buf, sizeof(buf));
             usart_printf("I2C Read FIFO: ");
             for (size_t i = 0; i < sizeof(buf); i++) {
                 usart_printf("0x%02X ", buf[i]);
@@ -717,7 +606,7 @@ static void handle_command(char *line) {
             usart_printf("Unknown function: %s\r\n", p);
         }
     } else {
-        usart_printf("Commands:\r\n  Read from register:\t\tr <reg>\r\n  Write to register:\t\tw <reg> <val>\r\n  Probe I2C addresses:\t\tp (probe)\r\n  Bulk read:\t\t\tb <reg>\r\n  Bulk write to register:\tn <reg> <val1> <val2> ...\r\n  Read bits in register:\tt <reg> \r\n  Call function:\t\tc <name> \r\n  Monitor messages:\t\tm  \r\n");
+        usart_printf("Commands:\r\n  Read from register:\t\tr <reg>\r\n  Write to register:\t\tw <reg> <val>\r\n  Probe I2C addresses:\t\tp (probe)\r\n  Bulk read:\t\t\tb <reg>\r\n  Bulk write to register:\tn <reg> <val1> <val2> ...\r\n  Read bits in register:\tt <reg> \r\n  Call function:\t\tc <name> \r\n");
     }
 }
 
@@ -725,24 +614,41 @@ int main(void) {
     clock_setup();
     systick_setup();
     usart_setup();
+    usart_getc(); // Wait for user
     i2c_setup();
     exti_setup();
+    fusb_init_sink(I2C1); // Initially setup as a sink                
 
-    usart_getc();
-    usart_printf("---- PD Debugger ----\r\n");
+    usart_printf("---- PD Debugger ----\r\n> ");
 
-    char line[32]; int pos=0;
+    char line[32];
+    int pos = 0;
+
     while (1) {
-        char c = usart_getc();
-        if (c=='\r' || c=='\n') {
-            line[pos]=0;
-            usart_printf("\r\n");
-            handle_command(line);
-            pos=0;
-            usart_printf("> ");
-        } else if (pos < (int)sizeof(line)-1) {
-            usart_send_blocking(USART2, c); /* echo */
-            line[pos++]=c;
+        // UART CLI Non-Blocking
+        if (uart_rx_ready()) {
+            char c = usart_recv(USART2);
+            if (c=='\r' || c=='\n') {
+                line[pos] = 0;
+                usart_printf("\r\n");
+                handle_command(line);
+                pos = 0;
+                usart_printf("> ");
+            } 
+            else if (pos < (int)sizeof(line)-1) {
+                usart_send_blocking(USART2, c);  // echo character
+                line[pos++] = c;
+            }
+        }
+
+        // Event handling
+        if (fusb_event_pending) {
+            fusb_event_pending = false;
+            while (!fusb_rx_empty()) {
+                pd_msg_t msg;
+                if (read_pd_message(&msg))
+                    handle_pd_message(&msg); 
+            }
         }
     }
 }
