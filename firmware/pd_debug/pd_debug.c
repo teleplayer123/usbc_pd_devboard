@@ -12,6 +12,9 @@
 #include <stdlib.h>
 #include "fusb302.h"
 
+// Buffer to store the raw packet data
+uint8_t rx_buffer[MAX_PD_PACKET_SIZE];
+
 /*---- MCU setup functions ----*/
 
 static void clock_setup(void) {
@@ -133,6 +136,30 @@ static void dump_bits(uint8_t reg, const struct bit_name *tbl)
             continue;  // skip unused bits             
 
         usart_printf("%s = %d\n", tbl[i].name, !!(reg & tbl[i].mask));
+    }
+}
+
+static void hexdump(const uint8_t *data, size_t len) {
+    for (size_t i = 0; i < len; i += 16) {
+        usart_printf("%04X: ", (unsigned int)i);
+        
+        // Print hex bytes
+        for (size_t j = 0; j < 16 && i + j < len; j++) {
+            usart_printf("%02X ", data[i + j]);
+        }
+        
+        // Padding for alignment
+        for (size_t j = len - i; j < 16; j++) {
+            usart_printf("   ");
+        }
+        
+        // Print ASCII representation
+        usart_printf(" | ");
+        for (size_t j = 0; j < 16 && i + j < len; j++) {
+            uint8_t c = data[i + j];
+            usart_printf("%c", (c >= 32 && c < 127) ? c : '.');
+        }
+        usart_printf("\r\n");
     }
 }
 
@@ -454,8 +481,6 @@ static void handle_pd_message(pd_msg_t *p){
 /* ---- Interrupt Handling and Decoding Logic ---- */
 
 void exti4_15_isr(void) {
-    // Buffer to store the raw packet data
-    uint8_t rx_buffer[MAX_PD_PACKET_SIZE];
     // Check if the interrupt is from EXTI line 8 (PB8)
     if (exti_get_flag_status(EXTI8)) {
         
@@ -557,6 +582,10 @@ void exti4_15_isr(void) {
             // Clear the pending EXTI interrupt flag
             exti_reset_request(EXTI8);
     }
+}
+
+static void check_rx_buffer(void) {
+
 }
 
 /* ---- CLI parser ---- */
