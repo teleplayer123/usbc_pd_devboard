@@ -497,119 +497,6 @@ static void check_rx_buffer(void) {
     hexdump(rx_buffer, MAX_PD_PACKET_SIZE);
 }
 
-/* ---- CLI parser ---- */
-static void handle_command(char *line) {
-    if (line[0] == 'r') {
-        uint8_t reg = (uint8_t)strtol(&line[1], NULL, 0);
-        uint8_t val;
-        fusb_read_reg(I2C1, reg, &val);
-        usart_printf("read[0x%02X] = 0x%02X\r\n", reg, val);
-    } else if (line[0] == 'w') {
-        char *p = strtok(&line[1], " ");
-        if (!p) { usart_printf("usage: w <reg> <val>\r\n"); return; }
-        uint8_t reg = (uint8_t)strtol(p, NULL, 0);
-        p = strtok(NULL, " ");
-        if (!p) { usart_printf("usage: w <reg> <val>\r\n"); return; }
-        uint8_t val = (uint8_t)strtol(p, NULL, 0);
-        fusb_write_reg(I2C1, reg, val);
-        usart_printf("write[0x%02X] = 0x%02X\r\n", reg, val);
-    } else if (line[0] == 'p') {
-        usart_printf("Scanning I2C...\r\n");
-        for (uint8_t addr=1; addr<0x7F; addr++) {
-            if (i2c_probe_addr(I2C1, addr)) {
-                usart_printf("Probed 0x%02X\r\n", addr);
-            }
-        }
-    } else if (line[0] == 'b') {
-        char *p = strtok(&line[1], " ");
-        if (!p) { usart_printf("bulk read usage: b <reg>\r\n"); return; }
-        uint8_t reg = (uint8_t)strtol(p, NULL, 0);
-        size_t nbytes = 80;
-        uint8_t buf[80]; 
-        fusb_read_reg_nbytes(I2C1, reg, buf, nbytes);
-        usart_printf("read[0x%02X] = ", reg);
-        for (int i=0; i<80; i++) {
-            usart_printf("0x%02X ", buf[i]);
-        }
-    } else if (line[0] == 'n') {
-        char *p = strtok(&line[1], " ");
-        if (!p) { usart_printf("bulk write usage: n <reg> <val1> <val2> ...\r\n"); return; }
-        uint8_t reg = (uint8_t)strtol(p, NULL, 0);
-        uint8_t buf[40];
-        size_t nbytes = 0;
-        while ((p = strtok(NULL, " ")) != NULL && nbytes < sizeof(buf)) {
-            buf[nbytes++] = (uint8_t)strtol(p, NULL, 0);
-        }
-        fusb_write_reg_nbytes(I2C1, reg, buf, nbytes);
-        usart_printf("bulk wrote %u bytes to reg 0x%02X\r\n", (unsigned)nbytes, reg);
-    } else if (line[0] == 't') {
-        // Print bits set in register
-        uint8_t reg = (uint8_t)strtol(&line[1], NULL, 0);
-        uint8_t val;
-        fusb_read_reg(I2C1, reg, &val);
-        print_byte_as_bits(val, reg);
-    } else if (line[0] == 'c') {
-        // Call a function by name
-        char *p = strtok(&line[1], " ");
-        if (!p) { usart_printf("usage: c <function_name>\r\n"); return; }
-        if (strcmp(p, "fusb_measure_cc_pin_src") == 0) {
-            int cc1_lvl = fusb_measure_cc_pin_src(I2C1, FUSB302_SW0_MEAS_CC1);
-            int cc2_lvl = fusb_measure_cc_pin_src(I2C1, FUSB302_SW0_MEAS_CC2);
-            usart_printf("CC1 level: %d, CC2 level: %d\r\n", cc1_lvl, cc2_lvl);
-        } else if (strcmp(p, "fusb_check_cc_lines") == 0) {
-            int ret = fusb_check_cc_lines(I2C1);
-            if (ret == 1) {
-                usart_printf("Device detected on CC1.\r\n");
-            } else if (ret == 2) {
-                usart_printf("Device detected on CC2.\r\n");
-            } else {
-                usart_printf("No device detected on CC lines.\r\n");
-            }
-        } else if (strcmp(p, "fusb_get_chip_id") == 0) {
-            uint8_t id = fusb_get_chip_id(I2C1);
-            usart_printf("FUSB302 Chip ID (Reg: 0x01): 0x%02X\r\n", id);
-        } else if (strcmp(p, "fusb_reset") == 0) {
-            fusb_reset(I2C1);
-            usart_printf("FUSB302 Reset (Reg: 0x0C) performed\r\n");
-        } else if (strcmp(p, "fusb_power_all") == 0) {
-            fusb_power_all(I2C1);
-            usart_printf("FUSB302 Power (Reg: 0x0B) all on\r\n");
-        } else if (strcmp(p, "fusb_pd_reset") == 0) {
-            fusb_pd_reset(I2C1);
-            usart_printf("FUSB302 PD Reset (Reg: 0x0C) performed\r\n");
-        } else if (strcmp(p, "fusb_setup_sniffer") == 0) {
-            fusb_setup_sniffer(I2C1);
-            usart_printf("FUSB302 Sniffer mode setup done\r\n");
-        } else if (strcmp(p, "fusb_enable_gcrc") == 0) {
-            p = strtok(NULL, " ");
-            if (!p) { usart_printf("usage: c fusb_enable_gcrc <0|1>\r\n"); return; }
-            bool enable = (strcmp(p, "1") == 0);
-            fusb_enable_gcrc(I2C1, enable);
-            usart_printf("FUSB302 AUTO_GCRC %s\r\n", enable ? "enabled" : "disabled");
-        } else if (strcmp(p, "fusb_flush_rx") == 0) {
-            fusb_flush_rx(I2C1);
-            usart_printf("FUSB302 RX FIFO flushed\r\n");
-        } else if (strcmp(p, "fusb_flush_tx") == 0) {
-            fusb_flush_tx(I2C1);
-            usart_printf("FUSB302 TX FIFO flushed\r\n");
-        } else if (strcmp(p, "fusb_read_fifo") == 0) {
-            uint8_t buf[32];
-            fusb_read_fifo(buf, sizeof(buf));
-            usart_printf("I2C Read FIFO: ");
-            for (size_t i = 0; i < sizeof(buf); i++) {
-                usart_printf("0x%02X ", buf[i]);
-            }
-            usart_printf("\r\n");
-        } else if (strcmp(p, "check_rx_buffer") == 0) {
-            check_rx_buffer();
-        } else {
-            usart_printf("Unknown function: %s\r\n", p);
-        }
-    } else {
-        usart_printf("Commands:\r\n  Read from register:\t\tr <reg>\r\n  Write to register:\t\tw <reg> <val>\r\n  Probe I2C addresses:\t\tp (probe)\r\n  Bulk read:\t\t\tb <reg>\r\n  Bulk write to register:\tn <reg> <val1> <val2> ...\r\n  Read bits in register:\tt <reg> \r\n  Call function:\t\tc <name> \r\n");
-    }
-}
-
 int main(void) {
     clock_setup();
     systick_setup();
@@ -618,28 +505,7 @@ int main(void) {
     exti_setup();
     fusb_init_sink(I2C1); // Initially setup as a sink                
 
-    usart_printf("---- PD Debugger ----\r\n> ");
-
-    char line[32];
-    int pos = 0;
-
     while (1) {
-        // UART CLI Non-Blocking
-        if (uart_rx_ready()) {
-            char c = usart_recv(USART2);
-            if (c=='\r' || c=='\n') {
-                line[pos] = 0;
-                usart_printf("\r\n");
-                handle_command(line);
-                pos = 0;
-                usart_printf("> ");
-            } 
-            else if (pos < (int)sizeof(line)-1) {
-                usart_send_blocking(USART2, c);  // echo character
-                line[pos++] = c;
-            }
-        }
-
         // Event handling
         if (fusb_event_pending) {
             fusb_event_pending = false;
@@ -650,4 +516,5 @@ int main(void) {
             }
         }
     }
+    return 0;
 }
