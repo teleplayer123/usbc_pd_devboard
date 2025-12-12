@@ -278,6 +278,9 @@
 #define PD_SRC_DEF_MV               1600
 #define PD_SRC_DEF_RD_MV            200
 #define	TYPEC_CC_VOLT_OPEN          0
+#define TYPEC_CC_VOLT_SNK_DEF       5
+#define TYPEC_CC_VOLT_SNK_MED       6
+#define TYPEC_CC_VOLT_SNK_HIGH      7
 #define	TYPEC_CC_VOLT_RA            1
 #define	TYPEC_CC_VOLT_RD            2
 

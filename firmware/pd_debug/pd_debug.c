@@ -254,6 +254,17 @@ static void fusb_delay_ms(uint32_t ms) {
     }
 }
 
+static void fusb_delay_us(uint32_t us) {
+    // At 48MHz, approximately 48 clock cycles per microsecond
+    // Using a simple busy-wait loop with NOP instructions
+    // Each NOP takes 1 cycle, loop overhead is minimal
+    for (uint32_t i = 0; i < us * 6; i++) {
+        __asm__("nop");
+    }
+}
+
+
+
 static void fusb_reset(uint32_t i2c) {
     fusb_write_reg(i2c, FUSB302_REG_RESET, FUSB302_RESET_SW);
     fusb_delay_ms(10);
@@ -278,6 +289,29 @@ static uint8_t fusb_get_chip_id(uint32_t i2c) {
     uint8_t id;
     fusb_read_reg(i2c, FUSB302_REG_DEVICE_ID, &id);
     return id;
+}
+
+static int bc_lvl_to_cc_voltage_snk(int bc_lvl) {
+    // Convert BC_LVL (2-bit value from STATUS0 register) to Type-C CC Voltage Status
+    // BC_LVL is extracted from bits FUSB302_STATUS0_BC_LVL1 and FUSB302_STATUS0_BC_LVL0
+    // Mapping:
+    //   00b = Open (no connection)
+    //   01b = Default Current (~0.5A, Vcc = 0.2V)
+    //   10b = Medium Current (~1.5A, Vcc = 0.66V)
+    //   11b = High Current (~3.0A, Vcc = 1.1V)
+    
+    switch (bc_lvl) {
+        case 0:  // 00b - Open
+            return TYPEC_CC_VOLT_OPEN;
+        case 1:  // 01b - Default Current
+            return TYPEC_CC_VOLT_SNK_DEF;
+        case 2:  // 10b - Medium Current
+            return TYPEC_CC_VOLT_SNK_MED;
+        case 3:  // 11b - High Current
+            return TYPEC_CC_VOLT_SNK_HIGH;
+        default:
+            return TYPEC_CC_VOLT_OPEN;
+    }
 }
 
 static int fusb_measure_cc_pin_src(uint32_t i2c, uint8_t cc_reg) {
@@ -320,6 +354,66 @@ static int fusb_measure_cc_pin_src(uint32_t i2c, uint8_t cc_reg) {
     return cc_lvl;
 }
 
+static void fusb_measure_cc_pin_snk(uint32_t i2c, int *cc1, int *cc2) {
+    uint8_t reg, orig_cc1, orig_cc2, bc_lvl_cc1, bc_lvl_cc2;
+
+    // Measure cc1
+    fusb_read_reg(i2c, FUSB302_REG_SWITCHES0, &reg);
+    if (reg & FUSB302_SW0_MEAS_CC1) {
+        orig_cc1 = 1;
+    } else {
+        orig_cc1 = 0;
+    }
+    if (reg & FUSB302_SW0_MEAS_CC2) {
+        orig_cc2 = 1;
+    } else {
+        orig_cc2 = 0;
+    }
+
+    // Disable cc2 measurement switch, enable cc1 measurement switch
+    reg &= ~FUSB302_SW0_MEAS_CC2;
+    reg |= FUSB302_SW0_MEAS_CC1;
+    fusb_write_reg(i2c, FUSB302_REG_SWITCHES0, reg);
+    // Wait for measurement
+    fusb_delay_us(250);
+    // Read cc1 measurement
+    fusb_read_reg(i2c, FUSB302_REG_STATUS0, &bc_lvl_cc1);
+    // Mask unwanted bits
+    bc_lvl_cc1 &= (FUSB302_STATUS0_BC_LVL0 | FUSB302_STATUS0_BC_LVL1);
+    usart_printf("CC1 Sink BC_LVL: %02X\r\n", bc_lvl_cc1);
+
+    // Measure cc2
+    fusb_read_reg(i2c, FUSB302_REG_SWITCHES0, &reg);
+    // Disable cc1 measurement switch and enable cc2 measurement switch
+    reg &= ~FUSB302_SW0_MEAS_CC1;
+    reg |= FUSB302_SW0_MEAS_CC2;
+    fusb_write_reg(i2c, FUSB302_REG_SWITCHES0, reg);
+    // Wait on measurement
+    fusb_delay_us(250);
+    // Read cc2 measurement
+    fusb_read_reg(i2c, FUSB302_REG_STATUS0, &bc_lvl_cc2);
+    // Mask unwanted bits
+    bc_lvl_cc2 &= (FUSB302_STATUS0_BC_LVL0 | FUSB302_STATUS0_BC_LVL1);
+
+    // Convert bc_lvl to typec cc voltage
+    *cc1 = bc_lvl_to_cc_voltage_snk(bc_lvl_cc1);
+    *cc2 = bc_lvl_to_cc_voltage_snk(bc_lvl_cc2);
+
+    // Reset MEAS switches to original state
+    fusb_read_reg(i2c, FUSB302_REG_SWITCHES0, &reg);
+    if (orig_cc1) {
+        reg |= FUSB302_SW0_MEAS_CC1;
+    } else {
+        reg &= ~FUSB302_SW0_MEAS_CC1;
+    }
+    if (orig_cc2) {
+        reg |= FUSB302_SW0_MEAS_CC2;
+    } else {
+        reg &= ~FUSB302_SW0_MEAS_CC2;
+    }
+    fusb_write_reg(i2c, FUSB302_REG_SWITCHES0, reg);
+}
+
 static void fusb_enable_gcrc(uint32_t i2c, bool enable) {
     uint8_t reg;
     // AUTO_GCRC is in SWITCHES1 register
@@ -331,7 +425,7 @@ static void fusb_enable_gcrc(uint32_t i2c, bool enable) {
     }
 }
 
-static int fusb_check_cc_lines(int32_t i2c) {
+static int fusb_check_cc_lines_src(int32_t i2c) {
     int ret = 0;
     fusb_power_all(i2c);
     int cc1_lvl = fusb_measure_cc_pin_src(i2c, FUSB302_SW0_MEAS_CC1);
@@ -548,6 +642,14 @@ static void handle_command(char *line) {
         uint8_t val;
         fusb_read_reg(I2C1, reg, &val);
         print_byte_as_bits(val, reg);
+    } else if (line[0] == 'm') {
+        fusb_init_sink(I2C1);
+        while (1) { // Device will need to be removed from power to get out of this mode
+            pd_msg_t msg;
+            if (read_pd_message(&msg)) {
+                handle_pd_message(&msg);
+            }
+        }
     } else if (line[0] == 'c') {
         // Call a function by name
         char *p = strtok(&line[1], " ");
@@ -556,8 +658,8 @@ static void handle_command(char *line) {
             int cc1_lvl = fusb_measure_cc_pin_src(I2C1, FUSB302_SW0_MEAS_CC1);
             int cc2_lvl = fusb_measure_cc_pin_src(I2C1, FUSB302_SW0_MEAS_CC2);
             usart_printf("CC1 level: %d, CC2 level: %d\r\n", cc1_lvl, cc2_lvl);
-        } else if (strcmp(p, "fusb_check_cc_lines") == 0) {
-            int ret = fusb_check_cc_lines(I2C1);
+        } else if (strcmp(p, "fusb_check_cc_lines_src") == 0) {
+            int ret = fusb_check_cc_lines_src(I2C1);
             if (ret == 1) {
                 usart_printf("Device detected on CC1.\r\n");
             } else if (ret == 2) {
@@ -565,6 +667,11 @@ static void handle_command(char *line) {
             } else {
                 usart_printf("No device detected on CC lines.\r\n");
             }
+        } else if (strcmp(p, "fusb_measure_cc_lines_snk") == 0) {
+            int cc1, cc2;
+            fusb_measure_cc_pin_snk(I2C1, &cc1, &cc2);
+            usart_printf("---- CC Sink Measurements ----\r\n");
+            usart_printf("CC1: %02X, CC2: %02X\r\n");
         } else if (strcmp(p, "fusb_get_chip_id") == 0) {
             uint8_t id = fusb_get_chip_id(I2C1);
             usart_printf("FUSB302 Chip ID (Reg: 0x01): 0x%02X\r\n", id);
@@ -602,6 +709,8 @@ static void handle_command(char *line) {
             usart_printf("\r\n");
         } else if (strcmp(p, "check_rx_buffer") == 0) {
             check_rx_buffer();
+        } else if (strcmp(p, "fusb_init_sink") == 0) {
+            fusb_init_sink(I2C1);
         } else {
             usart_printf("Unknown function: %s\r\n", p);
         }
@@ -615,8 +724,7 @@ int main(void) {
     systick_setup();
     usart_setup();
     i2c_setup();
-    exti_setup();
-    fusb_init_sink(I2C1); // Initially setup as a sink                
+    exti_setup();          
 
     usart_printf("---- PD Debugger ----\r\n> ");
 
