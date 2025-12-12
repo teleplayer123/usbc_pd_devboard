@@ -354,9 +354,8 @@ static int fusb_measure_cc_pin_src(uint32_t i2c, uint8_t cc_reg) {
     return cc_lvl;
 }
 
-static int fusb_measure_cc_pin_snk(uint32_t i2c) {
+static void fusb_measure_cc_pin_snk(uint32_t i2c, int *cc1, int *cc2) {
     uint8_t reg, orig_cc1, orig_cc2, bc_lvl_cc1, bc_lvl_cc2;
-    int cc1, cc2;
 
     // Measure cc1
     fusb_read_reg(i2c, FUSB302_REG_SWITCHES0, &reg);
@@ -397,8 +396,8 @@ static int fusb_measure_cc_pin_snk(uint32_t i2c) {
     bc_lvl_cc2 &= (FUSB302_STATUS0_BC_LVL0 | FUSB302_STATUS0_BC_LVL1);
 
     // Convert bc_lvl to typec cc voltage
-    cc1 = bc_lvl_to_cc_voltage_snk(bc_lvl_cc1);
-    cc2 = bc_lvl_to_cc_voltage_snk(bc_lvl_cc2);
+    *cc1 = bc_lvl_to_cc_voltage_snk(bc_lvl_cc1);
+    *cc2 = bc_lvl_to_cc_voltage_snk(bc_lvl_cc2);
 
     // Reset MEAS switches to original state
     fusb_read_reg(i2c, FUSB302_REG_SWITCHES0, &reg);
@@ -413,8 +412,6 @@ static int fusb_measure_cc_pin_snk(uint32_t i2c) {
         reg &= ~FUSB302_SW0_MEAS_CC2;
     }
     fusb_write_reg(i2c, FUSB302_REG_SWITCHES0, reg);
-
-    return cc1 ? cc1 : cc2;
 }
 
 static void fusb_enable_gcrc(uint32_t i2c, bool enable) {
@@ -671,9 +668,10 @@ static void handle_command(char *line) {
                 usart_printf("No device detected on CC lines.\r\n");
             }
         } else if (strcmp(p, "fusb_measure_cc_pin_snk") == 0) {
-            int cc = fusb_measure_cc_pin_snk(I2C1);
+            int cc1, cc2;
+            fusb_measure_cc_pin_snk(I2C1, &cc1, &cc2);
             usart_printf("---- CC Sink Measurements ----\r\n");
-            usart_printf("CC: %02X\r\n", cc);
+            usart_printf("CC1: %02X, CC2: %02X\r\n");
         } else if (strcmp(p, "fusb_get_chip_id") == 0) {
             uint8_t id = fusb_get_chip_id(I2C1);
             usart_printf("FUSB302 Chip ID (Reg: 0x01): 0x%02X\r\n", id);
