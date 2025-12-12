@@ -667,7 +667,7 @@ static void handle_command(char *line) {
             } else {
                 usart_printf("No device detected on CC lines.\r\n");
             }
-        } else if (strcmp(p, "fusb_measure_cc_lines_snk") == 0) {
+        } else if (strcmp(p, "fusb_measure_cc_pin_snk") == 0) {
             int cc1, cc2;
             fusb_measure_cc_pin_snk(I2C1, &cc1, &cc2);
             usart_printf("---- CC Sink Measurements ----\r\n");
