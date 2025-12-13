@@ -1,5 +1,3 @@
-#include <stdint.h>
-
 /* -----------------------------------------------------------
  * I2C Address
  * ----------------------------------------------------------- */
@@ -417,6 +415,3 @@ static const struct bit_name fusb302_control3_bits[] = {
     {FUSB302_CTL3_NRETRIES0, "NRETRIES0"},
     {FUSB302_CTL3_AUTO_RETRY, "AUTO_RETRY"},
 };
-
-void fusb_delay_ms(uint32_t ms);
-void fusb_reset(uint32_t i2c);

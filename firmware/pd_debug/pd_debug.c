@@ -644,11 +644,9 @@ static void handle_command(char *line) {
         print_byte_as_bits(val, reg);
     } else if (line[0] == 'm') {
         fusb_init_sink(I2C1);
-        while (1) { // Device will need to be removed from power to get out of this mode
-            pd_msg_t msg;
-            if (read_pd_message(&msg)) {
-                handle_pd_message(&msg);
-            }
+        for (int i=0; i<=10000; i++) {
+            check_rx_buffer();
+            fusb_delay_us(10);
         }
     } else if (line[0] == 'c') {
         // Call a function by name
@@ -749,13 +747,13 @@ int main(void) {
         }
 
         // Event handling
-        if (fusb_event_pending) {
-            fusb_event_pending = false;
-            while (!fusb_rx_empty()) {
-                pd_msg_t msg;
-                if (read_pd_message(&msg))
-                    handle_pd_message(&msg); 
-            }
-        }
+        // if (fusb_event_pending) {
+        //     fusb_event_pending = false;
+        //     while (!fusb_rx_empty()) {
+        //         pd_msg_t msg;
+        //         if (read_pd_message(&msg))
+        //             handle_pd_message(&msg); 
+        //     }
+        // }
     }
 }
