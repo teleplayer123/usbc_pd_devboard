@@ -746,13 +746,13 @@ int main(void) {
         }
 
         // Event handling
-        // if (fusb_event_pending) {
-        //     fusb_event_pending = false;
-        //     while (!fusb_rx_empty()) {
-        //         pd_msg_t msg;
-        //         if (read_pd_message(&msg))
-        //             handle_pd_message(&msg); 
-        //     }
-        // }
+        if (fusb_event_pending) {
+            fusb_event_pending = false;
+            while (!fusb_rx_empty()) {
+                pd_msg_t msg;
+                if (read_pd_message(&msg))
+                    handle_pd_message(&msg); 
+            }
+        }
     }
 }
