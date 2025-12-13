@@ -419,3 +419,4 @@ static const struct bit_name fusb302_control3_bits[] = {
 };
 
 void fusb_delay_ms(uint32_t ms);
+void fusb_reset(uint32_t i2c);
