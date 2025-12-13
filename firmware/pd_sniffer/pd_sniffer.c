@@ -11,6 +11,8 @@
 #include <string.h>
 #include <stdlib.h>
 #include "fusb302.h"
+#include "i2c.h"
+#include "usart.h"
 
 // Buffer to store the raw packet data
 uint8_t rx_buffer[MAX_PD_PACKET_SIZE];
@@ -84,12 +86,6 @@ static void exti_setup(void) {
     nvic_enable_irq(NVIC_EXTI4_15_IRQ); 
 }
 
-
-
-
-
-
-
 /* ---- PD Functions ----*/
 
 bool read_pd_message(pd_msg_t *pd)
@@ -97,12 +93,12 @@ bool read_pd_message(pd_msg_t *pd)
     if (fusb_rx_empty()) return false;
 
     uint8_t header[4];
-    fusb_read_fifo(header, 4);
+    i2c_read_fifo(header, 4);
     pd->header = header[2] | (header[3] << 8);
 
     int count = PD_HEADER_NUM_DATA_OBJECTS(pd->header);
     if (count > 0)
-        fusb_read_fifo((uint8_t*)pd->obj, count * 4);
+        i2c_read_fifo((uint8_t*)pd->obj, count * 4);
 
     i2c_write_reg(FUSB302_REG_CONTROL1, FUSB302_CTL1_RX_FLUSH); // clear FIFO
 
@@ -133,7 +129,7 @@ static void request_voltage(int mv, int ma){
 
     uint8_t reg=FUSB302_REG_FIFOS;
     i2c_transfer7(I2C1, FUSB302_ADDR, &reg, 1, tx, i);
-    fusb_write_reg(I2C1, FUSB302_REG_CONTROL0, FUSB302_CTL0_TX_START);
+    i2c_write_reg(I2C1, FUSB302_REG_CONTROL0, FUSB302_CTL0_TX_START);
 
     usart_printf("PD REQUEST sent: %dmV %dmA\n",mv,ma);
 }
