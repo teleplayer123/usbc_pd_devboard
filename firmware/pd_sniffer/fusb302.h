@@ -420,4 +420,6 @@ static const struct bit_name fusb302_control3_bits[] = {
     {FUSB302_CTL3_AUTO_RETRY, "AUTO_RETRY"},
 };
 
+
+
 #endif /* FUSB302_H */

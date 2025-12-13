@@ -1,3 +1,4 @@
+#include <libopencm3/stm32/usart.h>
 #include <sys/stat.h>
 #include <stdint.h>
 #include <errno.h>
@@ -7,6 +8,13 @@ int _read(int file, char *ptr, int len) {
     (void)ptr;
     errno = EINVAL;
     return -1;
+}
+
+/* simple blocking getchar/putchar */
+int _write(int fd, char *ptr, int len) {
+    (void)fd;
+    for (int i=0; i<len; i++) usart_send_blocking(USART2, ptr[i]);
+    return len;
 }
 
 int _close(int file) {
