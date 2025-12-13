@@ -5399,6 +5399,12 @@
 		(uuid "32112faf-5008-4dad-8c98-e990777e2fe9")
 	)
 	(junction
+		(at 41.91 121.92)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "34e17f19-42a2-44db-a973-297eb6c4c3c5")
+	)
+	(junction
 		(at 238.76 123.19)
 		(diameter 0)
 		(color 0 0 0 0)
@@ -5561,12 +5567,6 @@
 		(uuid "de1d30a8-6a4e-4207-a81a-f24537db3ee2")
 	)
 	(junction
-		(at 45.72 121.92)
-		(diameter 0)
-		(color 0 0 0 0)
-		(uuid "e399bbdf-feec-4f34-9467-8e777a51d392")
-	)
-	(junction
 		(at 50.8 45.72)
 		(diameter 0)
 		(color 0 0 0 0)
@@ -5623,10 +5623,6 @@
 	(no_connect
 		(at 256.54 62.23)
 		(uuid "2981dfa4-1300-4339-a7fe-2d60fbb9bcc3")
-	)
-	(no_connect
-		(at 49.53 127)
-		(uuid "3c1d6ca3-2e97-4d06-a919-8dba869560ac")
 	)
 	(no_connect
 		(at 256.54 59.69)
@@ -5866,6 +5862,16 @@
 	)
 	(wire
 		(pts
+			(xy 146.05 137.16) (xy 148.59 137.16)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "1a5b9e3a-0031-4b4d-9f42-9bf76194ceba")
+	)
+	(wire
+		(pts
 			(xy 27.94 110.49) (xy 27.94 111.76)
 		)
 		(stroke
@@ -5916,7 +5922,7 @@
 	)
 	(wire
 		(pts
-			(xy 34.29 121.92) (xy 45.72 121.92)
+			(xy 34.29 121.92) (xy 41.91 121.92)
 		)
 		(stroke
 			(width 0)
@@ -6276,16 +6282,6 @@
 	)
 	(wire
 		(pts
-			(xy 45.72 121.92) (xy 49.53 121.92)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "5ff76fb6-c2db-48dc-95ca-bf9005517c09")
-	)
-	(wire
-		(pts
 			(xy 195.58 132.08) (xy 195.58 129.54)
 		)
 		(stroke
@@ -6573,6 +6569,16 @@
 			(type default)
 		)
 		(uuid "93b40b79-0511-4976-900b-81ecd682a467")
+	)
+	(wire
+		(pts
+			(xy 49.53 127) (xy 48.26 127)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "94f6c25e-4cd2-49ba-aa52-20a260da7670")
 	)
 	(wire
 		(pts
@@ -6996,6 +7002,16 @@
 	)
 	(wire
 		(pts
+			(xy 146.05 134.62) (xy 148.59 134.62)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "d7409edc-ded9-402d-8fae-b37d49bc5879")
+	)
+	(wire
+		(pts
 			(xy 102.87 147.32) (xy 110.49 147.32)
 		)
 		(stroke
@@ -7093,6 +7109,16 @@
 			(type default)
 		)
 		(uuid "ee9bd88b-9973-4f02-8161-51cb46357c8a")
+	)
+	(wire
+		(pts
+			(xy 41.91 121.92) (xy 49.53 121.92)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "f11e955c-cd93-48c7-8782-9f15c14ecaca")
 	)
 	(wire
 		(pts
@@ -7214,6 +7240,16 @@
 		)
 		(uuid "2692f966-6333-491d-b6e1-a2ced96b4042")
 	)
+	(label "VIN"
+		(at 148.59 134.62 0)
+		(effects
+			(font
+				(size 1.016 1.016)
+			)
+			(justify left bottom)
+		)
+		(uuid "29f1c4dc-31a4-44a7-bf61-9e3604e5bc2c")
+	)
 	(label "I2C_SDA"
 		(at 205.74 95.25 180)
 		(effects
@@ -7274,6 +7310,16 @@
 		)
 		(uuid "47161713-5bfe-4d16-b9e9-e6fe7769690c")
 	)
+	(label "VIN"
+		(at 48.26 121.92 180)
+		(effects
+			(font
+				(size 1.016 1.016)
+			)
+			(justify right bottom)
+		)
+		(uuid "4867e2dc-73ec-4203-b136-264c589653a5")
+	)
 	(label "VBUS"
 		(at 27.94 110.49 180)
 		(effects
@@ -7333,6 +7379,16 @@
 			(justify right bottom)
 		)
 		(uuid "6d746070-8aac-4b32-bc49-01bec9291cd9")
+	)
+	(label "VIN_ENA"
+		(at 148.59 137.16 0)
+		(effects
+			(font
+				(size 1.016 1.016)
+			)
+			(justify left bottom)
+		)
+		(uuid "72e65807-5b4f-4bc2-8181-13a1e844689d")
 	)
 	(label "VBUS"
 		(at 111.76 36.83 0)
@@ -7493,6 +7549,16 @@
 			(justify left bottom)
 		)
 		(uuid "a6dbe435-8f3a-4fa3-a9e8-855ae9382445")
+	)
+	(label "VIN_ENA"
+		(at 48.26 127 180)
+		(effects
+			(font
+				(size 1.016 1.016)
+			)
+			(justify right bottom)
+		)
+		(uuid "b489d057-94ca-4102-bded-2d1fb6e75587")
 	)
 	(label "UART_TX"
 		(at 256.54 54.61 0)
@@ -8623,6 +8689,73 @@
 		)
 	)
 	(symbol
+		(lib_id "Connector:Conn_01x02_Pin")
+		(at 140.97 134.62 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "27adebec-70ce-4a58-82ec-416b9d2d537d")
+		(property "Reference" "J8"
+			(at 141.605 129.54 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "VIN_ENA_JP"
+			(at 140.716 131.572 0)
+			(effects
+				(font
+					(size 0.889 0.889)
+				)
+			)
+		)
+		(property "Footprint" "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical"
+			(at 140.97 134.62 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 140.97 134.62 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Generic connector, single row, 01x02, script generated"
+			(at 140.97 134.62 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "f12fb996-8ffb-47ed-a640-e3b30904349e")
+		)
+		(pin "2"
+			(uuid "2a0f7685-d79b-48f8-b9c6-0be92b43bb95")
+		)
+		(instances
+			(project ""
+				(path "/9d05689f-cd28-4719-8892-8398308a18b8"
+					(reference "J8")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "Device:C_Small")
 		(at 205.74 34.29 0)
 		(unit 1)
@@ -8823,7 +8956,7 @@
 	)
 	(symbol
 		(lib_id "power:PWR_FLAG")
-		(at 45.72 121.92 0)
+		(at 41.91 121.92 0)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
@@ -8831,7 +8964,7 @@
 		(dnp no)
 		(uuid "36f60479-c293-4024-8132-76fde45e522c")
 		(property "Reference" "#FLG01"
-			(at 45.72 120.015 0)
+			(at 41.91 120.015 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -8840,7 +8973,7 @@
 			)
 		)
 		(property "Value" "PWR_FLAG"
-			(at 45.72 117.856 0)
+			(at 41.91 117.856 0)
 			(effects
 				(font
 					(size 1.016 1.016)
@@ -8848,7 +8981,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 45.72 121.92 0)
+			(at 41.91 121.92 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -8857,7 +8990,7 @@
 			)
 		)
 		(property "Datasheet" "~"
-			(at 45.72 121.92 0)
+			(at 41.91 121.92 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -8866,7 +8999,7 @@
 			)
 		)
 		(property "Description" "Special symbol for telling ERC where power comes from"
-			(at 45.72 121.92 0)
+			(at 41.91 121.92 0)
 			(effects
 				(font
 					(size 1.27 1.27)
