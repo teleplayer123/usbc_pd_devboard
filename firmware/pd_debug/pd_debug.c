@@ -61,6 +61,7 @@ static void systick_setup(void) {
     systick_set_reload(48000 - 1);
     systick_set_clocksource(STK_CSR_CLKSOURCE_AHB); // Use AHB clock
     systick_counter_enable();
+    systick_interrupt_enable();
 }
 
 static void exti_setup(void) {
