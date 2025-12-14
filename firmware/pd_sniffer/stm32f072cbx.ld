@@ -1,6 +1,6 @@
-/* Linker script for the STM32F072CB chip (CBU is just a packaging variant) */
+/* Linker script for the STM32F072CB */
 
-/* Define memory regions */
+/* Memory regions */
 MEMORY {
   rom (rx) : ORIGIN = 0x08000000, LENGTH = 128K
   ram (rwx) : ORIGIN = 0x20000000, LENGTH = 16K
@@ -8,7 +8,7 @@ MEMORY {
 
 /* Include the common libopencm3 linker script */
 INCLUDE cortex-m-generic.ld
-/* Define the entry point, usually the reset handler in the startup file */
+/* Firmware entry point*/
 ENTRY(reset_handler)
 /*
  * The libopencm3 'common-template.ld' file expects these variables to be defined:

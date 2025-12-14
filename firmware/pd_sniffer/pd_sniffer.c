@@ -455,7 +455,7 @@ static void handle_command(const char *cmd)
  * EXTI ISR
  * ------------------------------------------------------------ */
 
-void exti4_15_isr(void)
+void EXTI4_15_IRQHandler(void)
 {
     if (exti_get_flag_status(EXTI8)) {
         exti_reset_request(EXTI8);
