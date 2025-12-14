@@ -1,3 +1,25 @@
+/*
+ * usb_pd_debugger_sniffer.c
+ * ------------------------------------------------------------
+ * FUSB302 + STM32 (libopencm3) USB-PD Debugger / Sniffer
+ *
+ * Features:
+ *  - Non-blocking UART CLI
+ *  - Safe EXTI handling (ISR only sets a flag)
+ *  - USB-PD Sink + Sniffer mode
+ *  - Verbose UART logging of all PD traffic
+ *  - Source Capabilities decode
+ *  - Manual PDO request via CLI
+ *
+ * Assumptions:
+ *  - USART2 used for CLI/logging
+ *  - I2C1 connected to FUSB302
+ *  - FUSB302 INT_N connected to EXTI0 (adjust if needed)
+ *  - system_millis provided by SysTick
+ *
+ * This is a DEBUG / BRING-UP tool, not a full PD stack.
+ */
+
 #include <libopencm3/stm32/rcc.h>
 #include <libopencm3/stm32/gpio.h>
 #include <libopencm3/stm32/usart.h>
@@ -12,7 +34,38 @@
 #include <stdlib.h>
 #include "fusb302.h"
 
-/*---- MCU setup functions ----*/
+/* ------------------------------------------------------------
+ * Globals
+ * ------------------------------------------------------------ */
+
+volatile uint32_t system_millis = 0;
+
+volatile bool fusb_event_pending = false;
+
+bool pd_monitor          = true;   /* basic logging */
+bool pd_sniffer_enabled  = true;   /* verbose sniffer */
+bool caps_received       = false;
+
+/* ------------------------------------------------------------
+ * PD Message Container
+ * ------------------------------------------------------------ */
+
+typedef struct {
+    uint16_t header;
+    uint32_t obj[7];
+} pd_msg_t;
+
+pd_msg_t last_caps;
+int last_pdo_count = 0;
+
+/* ------------------------------------------------------------
+ * MCU Setup Functions
+ * ------------------------------------------------------------ */
+
+void sys_tick_handler(void)
+{
+    system_millis++;
+}
 
 static void clock_setup(void) {
     rcc_clock_setup_in_hsi_out_48mhz();
@@ -51,11 +104,19 @@ static void i2c_setup(void) {
     i2c_peripheral_enable(I2C1);
 }
 
-static void systick_setup(void) {
-    // Set SysTick to trigger every 1ms (48MHz / 1000 = 48000)
-    systick_set_reload(48000 - 1);
-    systick_set_clocksource(STK_CSR_CLKSOURCE_AHB); // Use AHB clock
+// static void systick_setup(void) {
+//     // Set SysTick to trigger every 1ms (48MHz / 1000 = 48000)
+//     systick_set_reload(48000 - 1);
+//     systick_set_clocksource(STK_CSR_CLKSOURCE_AHB); // Use AHB clock
+//     systick_counter_enable();
+// }
+
+void systick_setup(void)
+{
+    systick_set_reload(rcc_ahb_frequency / 1000 - 1);
+    systick_set_clocksource(STK_CSR_CLKSOURCE_AHB);
     systick_counter_enable();
+    systick_interrupt_enable();
 }
 
 static void exti_setup(void) {
@@ -79,6 +140,10 @@ static void exti_setup(void) {
     nvic_enable_irq(NVIC_EXTI4_15_IRQ); 
 }
 
+/* ------------------------------------------------------------
+ * Low-level helpers
+ * ------------------------------------------------------------ */
+
 static void usart_send_char(char c) {
     usart_send_blocking(USART2, c);
 }
@@ -99,60 +164,140 @@ static void usart_printf(const char *format, ...) {
     }
 }
 
-
-volatile bool fusb_event_pending = false;
-bool pd_monitor = true;
-bool caps_received = false;
-pd_msg_t last_caps;
-int last_pdo_count = 0;
-
-/* ============================================================
- * Low-level helpers (I2C + UART)
- * ============================================================ */
-
-static void fusb_write(uint8_t reg, uint8_t val) {
-    i2c_transfer7(I2C1, FUSB302_ADDR << 1, &reg, 1, &val, 1);
-}
-
-static uint8_t fusb_read(uint8_t reg) {
-    uint8_t v;
-    i2c_transfer7(I2C1, FUSB302_ADDR << 1, &reg, 1, &v, 1);
-    return v;
-}
-
-static void fusb_read_fifo(uint8_t *buf, int len) {
-    uint8_t r = FUSB302_REG_FIFOS;
-    i2c_transfer7(I2C1, FUSB302_ADDR << 1, &r, 1, buf, len);
-}
-
-static bool uart_rx_ready(void) {
+static inline bool uart_rx_ready(void)
+{
     return usart_get_flag(USART2, USART_FLAG_RXNE);
 }
 
-/* ============================================================
- * FUSB302 / PD handling
- * ============================================================ */
+static inline void fusb_write(uint8_t reg, uint8_t val)
+{
+    i2c_transfer7(I2C1, FUSB302_ADDR, &reg, 1, &val, 1);
+}
 
-static bool fusb_rx_empty(void) {
+static inline uint8_t fusb_read(uint8_t reg)
+{
+    uint8_t v;
+    i2c_transfer7(I2C1, FUSB302_ADDR, &reg, 1, &v, 1);
+    return v;
+}
+
+static inline void fusb_read_fifo(uint8_t *buf, int len)
+{
+    uint8_t r = FUSB302_REG_FIFOS;
+    i2c_transfer7(I2C1, FUSB302_ADDR, &r, 1, buf, len);
+}
+
+static inline bool fusb_rx_empty(void)
+{
     return fusb_read(FUSB302_REG_STATUS1) & FUSB302_STATUS1_RX_EMPTY;
 }
 
-static bool read_pd_message(pd_msg_t *pd) {
-    if (fusb_rx_empty()) return false;
+/* ------------------------------------------------------------
+ * PD RX
+ * ------------------------------------------------------------ */
+
+static bool read_pd_message(pd_msg_t *pd)
+{
+    if (fusb_rx_empty())
+        return false;
 
     uint8_t hdr[4];
     fusb_read_fifo(hdr, 4);
+
     pd->header = hdr[2] | (hdr[3] << 8);
 
     int n = PD_HEADER_NUM_DATA_OBJECTS(pd->header);
     if (n > 0)
-        fusb_read_fifo((uint8_t*)pd->obj, n * 4);
+        fusb_read_fifo((uint8_t *)pd->obj, n * 4);
 
     fusb_write(FUSB302_REG_CONTROL1, FUSB302_CTL1_RX_FLUSH);
     return true;
 }
 
-static void pd_print_caps(void) {
+/* ------------------------------------------------------------
+ * PD Decode Helpers
+ * ------------------------------------------------------------ */
+
+static const char *pd_msg_name(uint8_t type, bool data)
+{
+    if (!data) {
+        switch (type) {
+        case 0:  return "GoodCRC";
+        case 1:  return "GotoMin";
+        case 2:  return "Accept";
+        case 3:  return "Reject";
+        case 6:  return "PS_RDY";
+        case 7:  return "Get_Source_Cap";
+        case 8:  return "Get_Sink_Cap";
+        case 13: return "Soft_Reset";
+        default: return "Ctrl_Unknown";
+        }
+    } else {
+        switch (type) {
+        case 1:  return "Source_Capabilities";
+        case 2:  return "Request";
+        case 4:  return "Sink_Capabilities";
+        case 15: return "Vendor_Defined";
+        default: return "Data_Unknown";
+        }
+    }
+}
+
+/* ------------------------------------------------------------
+ * Verbose PD Sniffer Logger
+ * ------------------------------------------------------------ */
+
+static void pd_sniffer_log(pd_msg_t *p)
+{
+    if (!pd_sniffer_enabled)
+        return;
+
+    uint8_t type  = PD_HEADER_MESSAGE_TYPE(p->header);
+    uint8_t nobj  = PD_HEADER_NUM_DATA_OBJECTS(p->header);
+    bool data     = (nobj > 0);
+
+    uint8_t msgid = (p->header >> 9) & 0x7;
+    uint8_t prole = (p->header >> 8) & 0x1;
+    uint8_t drole = (p->header >> 5) & 0x1;
+    uint8_t rev   = (p->header >> 6) & 0x3;
+
+    usart_printf(
+        "[%8lu ms] PD RX | %s | ID=%d | %s | %s | Rev=%d | Obj=%d | HDR=0x%04X\r\n",
+        system_millis,
+        pd_msg_name(type, data),
+        msgid,
+        prole ? "SRC" : "SNK",
+        drole ? "DFP" : "UFP",
+        rev,
+        nobj,
+        p->header
+    );
+
+    for (int i = 0; i < nobj; i++) {
+        usart_printf("    OBJ%d: 0x%08lX\r\n", i + 1, p->obj[i]);
+
+        if (type == 1) {
+            int mv = ((p->obj[i] >> 10) & 0x3FF) * 50;
+            int ma = (p->obj[i] & 0x3FF) * 10;
+            usart_printf("        -> %d mV @ %d mA\r\n", mv, ma);
+        }
+
+        if (type == 2) {
+            int pdo = (p->obj[i] >> 28) & 0x7;
+            int ma  = ((p->obj[i] >> 10) & 0x3FF) * 10;
+            int mv  = (p->obj[i] & 0x3FF) * 50;
+            usart_printf("        -> Request PDO%d %d mV %d mA\r\n",
+                          pdo, mv, ma);
+        }
+    }
+}
+
+/* ------------------------------------------------------------
+ * PD Actions
+ * ------------------------------------------------------------ */
+
+static void pd_print_caps(void)
+{
     usart_printf("\r\n=== Source Capabilities ===\r\n");
     for (int i = 0; i < last_pdo_count; i++) {
         uint32_t o = last_caps.obj[i];
@@ -162,8 +307,9 @@ static void pd_print_caps(void) {
     }
 }
 
-static void pd_send_request(int pdo, int mv, int ma) {
-    uint16_t hdr = (1 << 12); /* 1 data object */
+static void pd_send_request(int pdo, int mv, int ma)
+{
+    uint16_t hdr = (1 << 12); /* one data object */
     uint32_t rdo = ((pdo + 1) << 28) | ((ma / 10) << 10) | (mv / 50);
 
     uint8_t tx[20];
@@ -183,42 +329,54 @@ static void pd_send_request(int pdo, int mv, int ma) {
     tx[i++] = FUSB302_TX_TKN_TXON;
 
     uint8_t r = FUSB302_REG_FIFOS;
-    i2c_transfer7(I2C1, FUSB302_ADDR << 1, &r, 1, tx, i);
+    i2c_transfer7(I2C1, FUSB302_ADDR, &r, 1, tx, i);
     fusb_write(FUSB302_REG_CONTROL0, FUSB302_CTL0_TX_START);
 
-    usart_printf("Requesting %d mV %d mA\r\n", mv, ma);
+    usart_printf("PD: Requesting %d mV %d mA\r\n", mv, ma);
 }
 
-static void handle_pd_message(pd_msg_t *p) {
+/* ------------------------------------------------------------
+ * PD Dispatcher
+ * ------------------------------------------------------------ */
+
+static void handle_pd_message(pd_msg_t *p)
+{
+    pd_sniffer_log(p);
+
     uint8_t type = PD_HEADER_MESSAGE_TYPE(p->header);
 
-    if (type == 1) { /* Source Capabilities */
+    if (type == 1) {
         caps_received = true;
         last_caps = *p;
         last_pdo_count = PD_HEADER_NUM_DATA_OBJECTS(p->header);
-        pd_print_caps();
+        if (pd_monitor)
+            pd_print_caps();
     }
-    else if (type == 3) usart_printf("<< ACCEPT >>\r\n");
-    else if (type == 6) usart_printf("<< PS_RDY >>\r\n");
-
-    if (pd_monitor) {
-        usart_printf("PD msg type %d (%d objects)\r\n",
-                      type, PD_HEADER_NUM_DATA_OBJECTS(p->header));
-    }
+    else if (type == 3 && pd_monitor)
+        usart_printf("PD: ACCEPT\r\n");
+    else if (type == 6 && pd_monitor)
+        usart_printf("PD: PS_RDY\r\n");
 }
 
-/* ============================================================
+/* ------------------------------------------------------------
  * CLI
- * ============================================================ */
+ * ------------------------------------------------------------ */
 
-static void handle_command(const char *cmd) {
+static void handle_command(const char *cmd)
+{
     if (!strcmp(cmd, "help")) {
         usart_printf(
-            "help\r\ncaps\r\nreq 5|9|15|20\r\nmonitor on|off\r\nreset\r\n");
+            "help\r\n"
+            "caps\r\n"
+            "req 5|9|15|20\r\n"
+            "monitor on|off\r\n"
+            "sniff on|off\r\n"
+            "reset\r\n"
+        );
     }
     else if (!strcmp(cmd, "caps")) {
-        if (!caps_received) usart_printf("No caps yet\r\n");
-        else pd_print_caps();
+        if (caps_received) pd_print_caps();
+        else usart_printf("No caps received yet\r\n");
     }
     else if (!strncmp(cmd, "req", 3)) {
         int v = atoi(cmd + 4);
@@ -234,39 +392,44 @@ static void handle_command(const char *cmd) {
     }
     else if (!strcmp(cmd, "monitor on"))  pd_monitor = true;
     else if (!strcmp(cmd, "monitor off")) pd_monitor = false;
+    else if (!strcmp(cmd, "sniff on"))    pd_sniffer_enabled = true;
+    else if (!strcmp(cmd, "sniff off"))   pd_sniffer_enabled = false;
     else if (!strcmp(cmd, "reset"))
         fusb_write(FUSB302_REG_CONTROL3, FUSB302_CTL3_SEND_HARD_RESET);
     else
         usart_printf("Unknown command\r\n");
 }
 
-/* ============================================================
+/* ------------------------------------------------------------
  * EXTI ISR
- * ============================================================ */
+ * ------------------------------------------------------------ */
 
-void exti4_51_isr(void) {
-    exti_reset_request(EXTI8);
-    fusb_event_pending = true;
+void exti9_5_isr(void)
+{
+    if (exti_get_flag_status(EXTI8)) {
+        exti_reset_request(EXTI8);
+        fusb_event_pending = true;
+    }
 }
 
-/* ============================================================
+/* ------------------------------------------------------------
  * Main
- * ============================================================ */
+ * ------------------------------------------------------------ */
 
-int main(void) {
+int main(void)
+{
     clock_setup();
     systick_setup();
     usart_setup();
     i2c_setup();
     exti_setup();
 
-    usart_printf("---- PD Debugger ----\r\n> ");
+    usart_printf("---- USB-PD Debugger / Sniffer ----\r\n> ");
 
     char line[32];
     int pos = 0;
 
     while (1) {
-
         /* UART CLI (non-blocking) */
         if (uart_rx_ready()) {
             char c = usart_recv(USART2);

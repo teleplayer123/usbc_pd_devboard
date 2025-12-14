@@ -277,11 +277,6 @@
 #define	TYPEC_CC_VOLT_RA            1
 #define	TYPEC_CC_VOLT_RD            2
 
-typedef struct {
-    uint16_t header;
-    uint32_t obj[7];
-} pd_msg_t;
-
 /* -----------------------------------------------------------
  * Tokens for FIFOS register
  * ----------------------------------------------------------- */
