@@ -202,9 +202,7 @@ static void fusb_delay_us(uint32_t us) {
     }
 }
 
-static void fusb_setup_sniffer() {
-    uint8_t res, clear_mask;
-    
+static void fusb_setup_sniffer() {    
     usart_printf("Initializing FUSB302 for PD Sniffing...\n");
     
     // Reset the FUSB302
