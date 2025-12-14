@@ -581,7 +581,7 @@ static void handle_pd_message(pd_msg_t *p){
 
 /* ---- Interrupt Handling and Decoding Logic ---- */
 
-void exti4_15_isr(void) {
+void EXTI4_15_IRQHandler(void) {
     exti_reset_request(EXTI8);  // clear interrupt flag
     fusb_event_pending = true;  // signal main loop to handle PD
 }
