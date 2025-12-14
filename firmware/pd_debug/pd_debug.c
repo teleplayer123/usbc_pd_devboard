@@ -264,8 +264,6 @@ static void fusb_delay_us(uint32_t us) {
     }
 }
 
-
-
 static void fusb_reset(uint32_t i2c) {
     fusb_write_reg(i2c, FUSB302_REG_RESET, FUSB302_RESET_SW);
     fusb_delay_ms(10);

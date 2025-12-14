@@ -193,6 +193,50 @@ static inline bool fusb_rx_empty(void)
     return fusb_read(FUSB302_REG_STATUS1) & FUSB302_STATUS1_RX_EMPTY;
 }
 
+static void fusb_delay_us(uint32_t us) {
+    // At 48MHz, approximately 48 clock cycles per microsecond
+    // Using a simple busy-wait loop with NOP instructions
+    // Each NOP takes 1 cycle, loop overhead is minimal
+    for (uint32_t i = 0; i < us * 6; i++) {
+        __asm__("nop");
+    }
+}
+
+static void fusb_setup_sniffer() {
+    uint8_t res, clear_mask;
+    
+    usart_printf("Initializing FUSB302 for PD Sniffing...\n");
+    
+    // Reset the FUSB302
+    fusb_write(FUSB302_REG_RESET, FUSB302_RESET_SW);
+    fusb_delay_us(10000);
+
+    // Power on
+    fusb_write(FUSB302_REG_POWER, FUSB302_POWER_ALL_ON);
+
+    // Configure as sink (Rd on CC lines)
+    fusb_write(FUSB302_REG_SWITCHES0, FUSB302_SW0_PDWN1 | FUSB302_SW0_PDWN1);
+
+    // Enable CC comparators
+    fusb_write(FUSB302_REG_SWITCHES0, FUSB302_SW0_MEAS_CC1 | FUSB302_SW0_MEAS_CC2);
+
+    // Configure Control1: Enable reception of all SOP packet types for sniffing:
+    // SOP', SOP'', SOP'_DEBUG, SOP''_DEBUG
+    fusb_write(FUSB302_REG_CONTROL1, FUSB302_CTL1_ENSOP1 | FUSB302_CTL1_ENSOP2 | FUSB302_CTL1_ENSOP1DB | FUSB302_CTL1_ENSOP2DB);
+
+    // Configure Interrupt Masks: Unmask CRC_CHK (valid packet received) and ACTIVITY
+    uint8_t mask = 0xFF; 
+    mask &= ~(FUSB302_MASK_CRC_CHK | FUSB302_MASK_ACTIVITY);
+    fusb_write(FUSB302_REG_MASK, mask);
+
+    // Unmask all interrupts 
+    fusb_write(FUSB302_REG_MASKA, 0x00);
+    fusb_write(FUSB302_REG_MASKB, 0x00);
+    fusb_delay_us(500);
+
+    usart_printf("FUSB302 configured for PD Sniffing.\n");
+}
+
 /* ------------------------------------------------------------
  * PD RX
  * ------------------------------------------------------------ */
@@ -425,7 +469,7 @@ int main(void)
     i2c_setup();
     exti_setup();
 
-    usart_printf("---- USB-PD Debugger / Sniffer ----\r\n> ");
+    fusb_setup_sniffer();
 
     char line[32];
     int pos = 0;
