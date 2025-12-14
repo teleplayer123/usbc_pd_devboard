@@ -7,6 +7,8 @@
 #include <libopencm3/cm3/cortex.h>
 #include <libopencm3/cm3/systick.h>
 #include <stdio.h>
+#include <stdbool.h>
+#include <stdint.h>
 #include <stdarg.h>
 #include <string.h>
 #include <stdlib.h>

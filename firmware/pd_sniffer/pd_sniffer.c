@@ -19,7 +19,6 @@
  * ------------------------------------------------------------ */
 
 volatile uint32_t system_millis = 0;
-
 volatile bool fusb_event_pending = false;
 
 bool pd_monitor          = true;   /* basic logging */
@@ -145,6 +144,30 @@ static void usart_printf(const char *format, ...) {
     }
 }
 
+static void hexdump(const uint8_t *data, size_t len) {
+    for (size_t i = 0; i < len; i += 16) {
+        usart_printf("%04X: ", (unsigned int)i);
+        
+        // Print hex bytes
+        for (size_t j = 0; j < 16 && i + j < len; j++) {
+            usart_printf("%02X ", data[i + j]);
+        }
+        
+        // Padding for alignment
+        for (size_t j = len - i; j < 16; j++) {
+            usart_printf("   ");
+        }
+        
+        // Print ASCII representation
+        usart_printf(" | ");
+        for (size_t j = 0; j < 16 && i + j < len; j++) {
+            uint8_t c = data[i + j];
+            usart_printf("%c", (c >= 32 && c < 127) ? c : '.');
+        }
+        usart_printf("\r\n");
+    }
+}
+
 static inline bool uart_rx_ready(void)
 {
     return usart_get_flag(USART2, USART_FLAG_RXNE);
@@ -215,10 +238,17 @@ static void fusb_setup_sniffer() {
     usart_printf("FUSB302 configured for PD Sniffing.\n");
 }
 
+static void check_rx_buffer(void) {
+    uint8_t rx_buffer[80];
+    fusb_read_fifo(rx_buffer, 80);
+    hexdump(rx_buffer, 80);
+}
+
 static void fusb_get_status(void) {
     uint8_t st0 = fusb_read(FUSB302_REG_STATUS0);
     uint8_t st1 = fusb_read(FUSB302_REG_STATUS1);
     usart_printf("FUSB STATUS0=0x%02X STATUS1=0x%02X\r\n", st0, st1);
+    check_rx_buffer();
 }
 
 /* ------------------------------------------------------------
@@ -437,7 +467,7 @@ static void handle_command(const char *cmd)
  * EXTI ISR
  * ------------------------------------------------------------ */
 
-void EXTI4_15_IRQHandler(void)
+void exti4_15_isr(void)
 {
     if (exti_get_flag_status(EXTI8)) {
         exti_reset_request(EXTI8);
@@ -464,6 +494,7 @@ int main(void)
     int pos = 0;
 
     while (1) {
+
         /* UART CLI (non-blocking) */
         if (uart_rx_ready()) {
             char c = usart_recv(USART2);
@@ -481,12 +512,12 @@ int main(void)
 
         /* USB-PD handling */
         if (fusb_event_pending) {
-            fusb_event_pending = false;
             while (!fusb_rx_empty()) {
                 pd_msg_t msg;
                 if (read_pd_message(&msg))
                     handle_pd_message(&msg);
             }
+            fusb_event_pending = false;
         }
     }
 }
