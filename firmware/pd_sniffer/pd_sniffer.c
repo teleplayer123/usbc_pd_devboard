@@ -244,8 +244,8 @@ static void handle_command(const char *cmd) {
  * EXTI ISR
  * ============================================================ */
 
-void exti0_1_isr(void) {
-    exti_reset_request(EXTI0);
+void exti4_51_isr(void) {
+    exti_reset_request(EXTI8);
     fusb_event_pending = true;
 }
 
