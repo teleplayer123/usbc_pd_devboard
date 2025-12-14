@@ -1,25 +1,3 @@
-/*
- * usb_pd_debugger_sniffer.c
- * ------------------------------------------------------------
- * FUSB302 + STM32 (libopencm3) USB-PD Debugger / Sniffer
- *
- * Features:
- *  - Non-blocking UART CLI
- *  - Safe EXTI handling (ISR only sets a flag)
- *  - USB-PD Sink + Sniffer mode
- *  - Verbose UART logging of all PD traffic
- *  - Source Capabilities decode
- *  - Manual PDO request via CLI
- *
- * Assumptions:
- *  - USART2 used for CLI/logging
- *  - I2C1 connected to FUSB302
- *  - FUSB302 INT_N connected to EXTI0 (adjust if needed)
- *  - system_millis provided by SysTick
- *
- * This is a DEBUG / BRING-UP tool, not a full PD stack.
- */
-
 #include <libopencm3/stm32/rcc.h>
 #include <libopencm3/stm32/gpio.h>
 #include <libopencm3/stm32/usart.h>
@@ -32,6 +10,8 @@
 #include <stdarg.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stdint.h>
+#include <stdbool.h>
 #include "fusb302.h"
 
 /* ------------------------------------------------------------
@@ -298,8 +278,10 @@ static const char *pd_msg_name(uint8_t type, bool data)
 
 static void pd_sniffer_log(pd_msg_t *p)
 {
-    if (!pd_sniffer_enabled)
+    if (!pd_sniffer_enabled) {
+        usart_printf("Sniffer needs to be enabled.\r\n");
         return;
+    }
 
     uint8_t type  = PD_HEADER_MESSAGE_TYPE(p->header);
     uint8_t nobj  = PD_HEADER_NUM_DATA_OBJECTS(p->header);
