@@ -5513,6 +5513,12 @@
 		(uuid "a8cf0844-69ef-4b26-902c-ba18fb3658a9")
 	)
 	(junction
+		(at 48.26 121.92)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "a9aad338-0324-43a8-a799-fe79aea072ba")
+	)
+	(junction
 		(at 83.82 121.92)
 		(diameter 0)
 		(color 0 0 0 0)
@@ -5862,16 +5868,6 @@
 	)
 	(wire
 		(pts
-			(xy 146.05 137.16) (xy 148.59 137.16)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "1a5b9e3a-0031-4b4d-9f42-9bf76194ceba")
-	)
-	(wire
-		(pts
 			(xy 27.94 110.49) (xy 27.94 111.76)
 		)
 		(stroke
@@ -5969,6 +5965,16 @@
 			(type default)
 		)
 		(uuid "29d41e7a-a9eb-4a03-928a-8f8a0a90c547")
+	)
+	(wire
+		(pts
+			(xy 48.26 121.92) (xy 49.53 121.92)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "2ab64fb9-ca48-43be-95b1-9551d913ce54")
 	)
 	(wire
 		(pts
@@ -6572,16 +6578,6 @@
 	)
 	(wire
 		(pts
-			(xy 49.53 127) (xy 48.26 127)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "94f6c25e-4cd2-49ba-aa52-20a260da7670")
-	)
-	(wire
-		(pts
 			(xy 175.26 27.94) (xy 177.8 27.94)
 		)
 		(stroke
@@ -6892,6 +6888,26 @@
 	)
 	(wire
 		(pts
+			(xy 48.26 127) (xy 48.26 121.92)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "c588be16-f2a1-4f46-8827-73120fbb53ea")
+	)
+	(wire
+		(pts
+			(xy 49.53 127) (xy 48.26 127)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "c6f06c65-9539-4efa-a50c-aa037aabcbf1")
+	)
+	(wire
+		(pts
 			(xy 82.55 167.64) (xy 93.98 167.64)
 		)
 		(stroke
@@ -7002,16 +7018,6 @@
 	)
 	(wire
 		(pts
-			(xy 146.05 134.62) (xy 148.59 134.62)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "d7409edc-ded9-402d-8fae-b37d49bc5879")
-	)
-	(wire
-		(pts
 			(xy 102.87 147.32) (xy 110.49 147.32)
 		)
 		(stroke
@@ -7112,7 +7118,7 @@
 	)
 	(wire
 		(pts
-			(xy 41.91 121.92) (xy 49.53 121.92)
+			(xy 41.91 121.92) (xy 48.26 121.92)
 		)
 		(stroke
 			(width 0)
@@ -7240,16 +7246,6 @@
 		)
 		(uuid "2692f966-6333-491d-b6e1-a2ced96b4042")
 	)
-	(label "VIN"
-		(at 148.59 134.62 0)
-		(effects
-			(font
-				(size 1.016 1.016)
-			)
-			(justify left bottom)
-		)
-		(uuid "29f1c4dc-31a4-44a7-bf61-9e3604e5bc2c")
-	)
 	(label "I2C_SDA"
 		(at 205.74 95.25 180)
 		(effects
@@ -7310,16 +7306,6 @@
 		)
 		(uuid "47161713-5bfe-4d16-b9e9-e6fe7769690c")
 	)
-	(label "VIN"
-		(at 48.26 121.92 180)
-		(effects
-			(font
-				(size 1.016 1.016)
-			)
-			(justify right bottom)
-		)
-		(uuid "4867e2dc-73ec-4203-b136-264c589653a5")
-	)
 	(label "VBUS"
 		(at 27.94 110.49 180)
 		(effects
@@ -7379,16 +7365,6 @@
 			(justify right bottom)
 		)
 		(uuid "6d746070-8aac-4b32-bc49-01bec9291cd9")
-	)
-	(label "VIN_ENA"
-		(at 148.59 137.16 0)
-		(effects
-			(font
-				(size 1.016 1.016)
-			)
-			(justify left bottom)
-		)
-		(uuid "72e65807-5b4f-4bc2-8181-13a1e844689d")
 	)
 	(label "VBUS"
 		(at 111.76 36.83 0)
@@ -7549,16 +7525,6 @@
 			(justify left bottom)
 		)
 		(uuid "a6dbe435-8f3a-4fa3-a9e8-855ae9382445")
-	)
-	(label "VIN_ENA"
-		(at 48.26 127 180)
-		(effects
-			(font
-				(size 1.016 1.016)
-			)
-			(justify right bottom)
-		)
-		(uuid "b489d057-94ca-4102-bded-2d1fb6e75587")
 	)
 	(label "UART_TX"
 		(at 256.54 54.61 0)
@@ -8683,73 +8649,6 @@
 			(project ""
 				(path "/9d05689f-cd28-4719-8892-8398308a18b8"
 					(reference "#PWR01")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "Connector:Conn_01x02_Pin")
-		(at 140.97 134.62 0)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(uuid "27adebec-70ce-4a58-82ec-416b9d2d537d")
-		(property "Reference" "J8"
-			(at 141.605 129.54 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "VIN_ENA_JP"
-			(at 140.716 131.572 0)
-			(effects
-				(font
-					(size 0.889 0.889)
-				)
-			)
-		)
-		(property "Footprint" "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical"
-			(at 140.97 134.62 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Datasheet" "~"
-			(at 140.97 134.62 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "Generic connector, single row, 01x02, script generated"
-			(at 140.97 134.62 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(pin "1"
-			(uuid "f12fb996-8ffb-47ed-a640-e3b30904349e")
-		)
-		(pin "2"
-			(uuid "2a0f7685-d79b-48f8-b9c6-0be92b43bb95")
-		)
-		(instances
-			(project ""
-				(path "/9d05689f-cd28-4719-8892-8398308a18b8"
-					(reference "J8")
 					(unit 1)
 				)
 			)
