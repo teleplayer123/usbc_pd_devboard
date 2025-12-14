@@ -237,6 +237,12 @@ static void fusb_setup_sniffer() {
     usart_printf("FUSB302 configured for PD Sniffing.\n");
 }
 
+static void fusb_get_status(void) {
+    uint8_t st0 = fusb_read(FUSB302_REG_STATUS0);
+    uint8_t st1 = fusb_read(FUSB302_REG_STATUS1);
+    usart_printf("FUSB STATUS0=0x%02X STATUS1=0x%02X\r\n", st0, st1);
+}
+
 /* ------------------------------------------------------------
  * PD RX
  * ------------------------------------------------------------ */
@@ -416,6 +422,7 @@ static void handle_command(const char *cmd)
             "req 5|9|15|20\r\n"
             "monitor on|off\r\n"
             "sniff on|off\r\n"
+            "status\r\n"
             "reset\r\n"
         );
     }
@@ -439,6 +446,7 @@ static void handle_command(const char *cmd)
     else if (!strcmp(cmd, "monitor off")) pd_monitor = false;
     else if (!strcmp(cmd, "sniff on"))    pd_sniffer_enabled = true;
     else if (!strcmp(cmd, "sniff off"))   pd_sniffer_enabled = false;
+    else if (!(strcmp(cmd, "status")))    fusb_get_status();
     else if (!strcmp(cmd, "reset"))
         fusb_write(FUSB302_REG_CONTROL3, FUSB302_CTL3_SEND_HARD_RESET);
     else
