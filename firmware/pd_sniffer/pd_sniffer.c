@@ -460,6 +460,7 @@ void exti4_15_isr(void)
     if (exti_get_flag_status(EXTI8)) {
         exti_reset_request(EXTI8);
         fusb_event_pending = true;
+        usart_printf("INT!\r\n");
     }
 }
 
