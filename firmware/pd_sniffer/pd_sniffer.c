@@ -504,6 +504,7 @@ int main(void)
 
         /* USB-PD handling */
         if (fusb_event_pending) {
+            usart_printf("Event pending...\r\n");
             while (!fusb_rx_empty()) {
                 pd_msg_t msg;
                 if (read_pd_message(&msg))
