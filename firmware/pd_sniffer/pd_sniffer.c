@@ -496,32 +496,43 @@ int main(void)
     char line[32];
     int pos = 0;
 
-    while (1) {
+    // while (1) {
         
-        /* UART CLI (non-blocking) */
-        if (uart_rx_ready()) {
-            char c = usart_recv(USART2);
-            if (c == '\r' || c == '\n') {
-                line[pos] = 0;
-                usart_printf("\r\n");
-                handle_command(line);
-                pos = 0;
-                usart_printf("> ");
-            } else if (pos < (int)sizeof(line) - 1) {
-                usart_send_blocking(USART2, c);
-                line[pos++] = c;
-            }
-        }
+    //     /* UART CLI (non-blocking) */
+    //     if (uart_rx_ready()) {
+    //         char c = usart_recv(USART2);
+    //         if (c == '\r' || c == '\n') {
+    //             line[pos] = 0;
+    //             usart_printf("\r\n");
+    //             handle_command(line);
+    //             pos = 0;
+    //             usart_printf("> ");
+    //         } else if (pos < (int)sizeof(line) - 1) {
+    //             usart_send_blocking(USART2, c);
+    //             line[pos++] = c;
+    //         }
+    //     }
 
-        /* USB-PD handling */
-        if (fusb_event_pending) {
-            usart_printf("Event pending...\r\n");
-            while (!fusb_rx_empty()) {
-                pd_msg_t msg;
-                if (read_pd_message(&msg))
-                    handle_pd_message(&msg);
+    //     /* USB-PD handling */
+    //     if (fusb_event_pending) {
+    //         usart_printf("Event pending...\r\n");
+    //         while (!fusb_rx_empty()) {
+    //             pd_msg_t msg;
+    //             if (read_pd_message(&msg))
+    //                 handle_pd_message(&msg);
+    //         }
+    //         fusb_event_pending = false;
+    //     }
+    // }
+
+    while (1) {
+        if (!fusb_rx_empty()) {
+            usart_printf("RX FIFO NOT EMPTY\r\n");
+
+            pd_msg_t msg;
+            if (read_pd_message(&msg)) {
+                usart_printf("RX HDR=0x%04X\r\n", msg.header);
             }
-            fusb_event_pending = false;
         }
     }
 }
