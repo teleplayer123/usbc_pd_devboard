@@ -83,21 +83,13 @@ static void i2c_setup(void) {
     i2c_peripheral_enable(I2C1);
 }
 
-static void systick_setup(void) {
-    // Set SysTick to trigger every 1ms (48MHz / 1000 = 48000)
-    systick_set_reload(48000 - 1);
-    systick_set_clocksource(STK_CSR_CLKSOURCE_AHB); // Use AHB clock
+static void systick_setup(void)
+{
+    systick_set_reload(rcc_ahb_frequency / 1000 - 1);
+    systick_set_clocksource(STK_CSR_CLKSOURCE_AHB);
     systick_counter_enable();
     systick_interrupt_enable();
 }
-
-// void systick_setup(void)
-// {
-//     systick_set_reload(rcc_ahb_frequency / 1000 - 1);
-//     systick_set_clocksource(STK_CSR_CLKSOURCE_AHB);
-//     systick_counter_enable();
-//     systick_interrupt_enable();
-// }
 
 static void exti_setup(void) {
     // FUSB302 INT_N is connected to PB8
