@@ -14,8 +14,6 @@
 #include <stdlib.h>
 #include "fusb302.h"
 
-// Buffer to store the raw packet data
-uint8_t rx_buffer[MAX_PD_PACKET_SIZE];
 // Status flag for exti handler
 volatile bool fusb_event_pending = false;
 
@@ -583,13 +581,15 @@ static void handle_pd_message(pd_msg_t *p){
 
 /* ---- Interrupt Handling and Decoding Logic ---- */
 
-void EXTI4_15_IRQHandler(void) {
+void exti4_15_isr(void) {
     exti_reset_request(EXTI8);  // clear interrupt flag
     fusb_event_pending = true;  // signal main loop to handle PD
 }
 
 static void check_rx_buffer(void) {
-    hexdump(rx_buffer, MAX_PD_PACKET_SIZE);
+    uint8_t rx_buffer[80];
+    fusb_read_fifo(rx_buffer, 80);
+    hexdump(rx_buffer, 80);
 }
 
 /* ---- CLI parser ---- */

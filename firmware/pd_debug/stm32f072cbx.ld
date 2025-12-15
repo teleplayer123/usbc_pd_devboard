@@ -18,8 +18,4 @@ ENTRY(reset_handler)
  *    * __flash_len
  *    * __ram_start
  *    * __ram_len
-     */
-/* Define the stack size for the main program */
-__stack_size = 2K;
-/* Define the heap size */
-__heap_size = 4K;
+ */
