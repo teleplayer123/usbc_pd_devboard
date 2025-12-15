@@ -493,8 +493,8 @@ int main(void)
 
     fusb_setup_sniffer();
 
-    char line[32];
-    int pos = 0;
+    // char line[32];
+    // int pos = 0;
 
     // while (1) {
         
