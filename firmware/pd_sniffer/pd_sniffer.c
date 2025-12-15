@@ -217,10 +217,8 @@ static void fusb_setup_sniffer() {
     // SOP', SOP'', SOP'_DEBUG, SOP''_DEBUG
     fusb_write(FUSB302_REG_CONTROL1, FUSB302_CTL1_ENSOP1 | FUSB302_CTL1_ENSOP2 | FUSB302_CTL1_ENSOP1DB | FUSB302_CTL1_ENSOP2DB);
 
-    // Configure Interrupt Masks: Unmask CRC_CHK (valid packet received) and ACTIVITY
-    uint8_t mask = 0xFF; 
-    mask &= ~(FUSB302_MASK_CRC_CHK | FUSB302_MASK_ACTIVITY);
-    fusb_write(FUSB302_REG_MASK, mask);
+    // Accept SOP packets
+    fusb_write(FUSB302_REG_CONTROL2, FUSB302_CTL2_WAKE_EN | FUSB302_CTL2_TOGGLE);
 
     // Unmask all interrupts 
     fusb_write(FUSB302_REG_MASKA, 0x00);
@@ -250,19 +248,31 @@ static void fusb_get_status(void) {
 
 static bool read_pd_message(pd_msg_t *pd)
 {
-    if (fusb_rx_empty())
+    uint8_t tok;
+
+    /* Wait for SOP token */
+    fusb_read_fifo(&tok, 1);
+    if (!(tok & 0x80))   // not a token
         return false;
 
-    uint8_t hdr[4];
-    fusb_read_fifo(hdr, 4);
+    /* PACKSYM (header) */
+    fusb_read_fifo(&tok, 1);
+    if ((tok & 0xE0) != FUSB302_TX_TKN_PACKSYM)
+        return false;
 
-    pd->header = hdr[2] | (hdr[3] << 8);
+    /* Header */
+    uint8_t hdr[2];
+    fusb_read_fifo(hdr, 2);
+    pd->header = hdr[0] | (hdr[1] << 8);
 
     int n = PD_HEADER_NUM_DATA_OBJECTS(pd->header);
-    if (n > 0)
-        fusb_read_fifo((uint8_t *)pd->obj, n * 4);
 
-    fusb_write(FUSB302_REG_CONTROL1, FUSB302_CTL1_RX_FLUSH);
+    /* PACKSYM (data) */
+    if (n > 0) {
+        fusb_read_fifo(&tok, 1);  // PACKSYM
+        fusb_read_fifo((uint8_t *)pd->obj, n * 4);
+    }
+
     return true;
 }
 
