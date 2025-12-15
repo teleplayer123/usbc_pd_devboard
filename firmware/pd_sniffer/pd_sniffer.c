@@ -241,6 +241,7 @@ static void fusb_get_status(void) {
     uint8_t st1 = fusb_read(FUSB302_REG_STATUS1);
     usart_printf("FUSB STATUS0=0x%02X STATUS1=0x%02X\r\n", st0, st1);
     check_rx_buffer();
+    usart_printf("INT pin=%02X\r\n", gpio_get(GPIOB, GPIO8) ? 1 : 0);
 }
 
 /* ------------------------------------------------------------
@@ -486,7 +487,7 @@ int main(void)
     int pos = 0;
 
     while (1) {
-
+        
         /* UART CLI (non-blocking) */
         if (uart_rx_ready()) {
             char c = usart_recv(USART2);
