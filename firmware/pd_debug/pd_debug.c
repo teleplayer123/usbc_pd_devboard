@@ -467,9 +467,7 @@ static void fusb_init_sink(uint32_t i2c) {
     usart_printf("FUSB302 initialized in Sink mode.\n");
 }
 
-static void fusb_setup_sniffer(int32_t i2c) {
-    uint8_t res, clear_mask;
-    
+static void fusb_setup_sniffer(int32_t i2c) {    
     usart_printf("Initializing FUSB302 for PD Sniffing...\n");
     
     // Reset the FUSB302
@@ -478,27 +476,19 @@ static void fusb_setup_sniffer(int32_t i2c) {
 
     // Power on
     fusb_write_reg(i2c, FUSB302_REG_POWER, FUSB302_POWER_ALL_ON);
-    fusb_delay_ms(200);
 
      // Configure Switches0: Enable measurement (passive detection) on CC1 and CC2
-    uint8_t switches0 = FUSB302_SW0_MEAS_CC1 | FUSB302_SW0_MEAS_CC2;
-    fusb_write_reg(i2c, FUSB302_REG_SWITCHES0, switches0);
+    fusb_write_reg(i2c, FUSB302_REG_SWITCHES0, FUSB302_SW0_MEAS_CC1 | FUSB302_SW0_MEAS_CC2);
 
-    // Disable pull-downs
-    fusb_read_reg(i2c, FUSB302_REG_SWITCHES0, &res);
-    clear_mask = ~(FUSB302_SW0_PDWN1 | FUSB302_SW0_PDWN2) & 0xFF;
-    res &= clear_mask;
-    fusb_write_reg(i2c, FUSB302_REG_SWITCHES0, res);
+    // Configure as sink (Rd on CC lines)
+    fusb_write_reg(i2c, FUSB302_REG_SWITCHES0, FUSB302_SW0_PDWN1 | FUSB302_SW0_PDWN1);
 
     // Configure Control1: Enable reception of all SOP packet types for sniffing:
     // SOP', SOP'', SOP'_DEBUG, SOP''_DEBUG
-    uint8_t control1 = FUSB302_CTL1_ENSOP1 | FUSB302_CTL1_ENSOP2 | FUSB302_CTL1_ENSOP1DB | FUSB302_CTL1_ENSOP2DB;
-    fusb_write_reg(i2c, FUSB302_REG_CONTROL1, control1);
+    fusb_write_reg(i2c, FUSB302_REG_CONTROL1, FUSB302_CTL1_ENSOP1 | FUSB302_CTL1_ENSOP2 | FUSB302_CTL1_ENSOP1DB | FUSB302_CTL1_ENSOP2DB);
 
-    // Configure Interrupt Masks: Unmask CRC_CHK (valid packet received) and ACTIVITY
-    uint8_t mask = 0xFF; 
-    mask &= ~(FUSB302_MASK_CRC_CHK | FUSB302_MASK_ACTIVITY);
-    fusb_write_reg(i2c, FUSB302_REG_MASK, mask);
+    // Accept SOP packets
+    fusb_write_reg(i2c, FUSB302_REG_CONTROL2, FUSB302_CTL2_WAKE_EN | FUSB302_CTL2_TOGGLE);
 
     // Unmask all interrupts 
     fusb_write_reg(i2c, FUSB302_REG_MASKA, 0x00);
