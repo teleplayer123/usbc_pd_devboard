@@ -290,7 +290,7 @@ static uint8_t fusb_get_chip_id(uint32_t i2c) {
     return id;
 }
 
-static int bc_lvl_to_cc_voltage_snk(int bc_lvl) {
+static int bc_lvl_to_cc_voltage_snk(uint8_t bc_lvl) {
     // Convert BC_LVL (2-bit value from STATUS0 register) to Type-C CC Voltage Status
     // BC_LVL is extracted from bits FUSB302_STATUS0_BC_LVL1 and FUSB302_STATUS0_BC_LVL0
     // Mapping:
@@ -353,7 +353,7 @@ static int fusb_measure_cc_pin_src(uint32_t i2c, uint8_t cc_reg) {
     return cc_lvl;
 }
 
-static void fusb_measure_cc_pin_snk(uint32_t i2c, int *cc1, int *cc2) {
+static void fusb_measure_cc_pin_snk(uint32_t i2c, uint8_t *cc1, uint8_t *cc2) {
     uint8_t reg, orig_cc1, orig_cc2, bc_lvl_cc1, bc_lvl_cc2;
 
     // Measure cc1
@@ -393,6 +393,7 @@ static void fusb_measure_cc_pin_snk(uint32_t i2c, int *cc1, int *cc2) {
     fusb_read_reg(i2c, FUSB302_REG_STATUS0, &bc_lvl_cc2);
     // Mask unwanted bits
     bc_lvl_cc2 &= (FUSB302_STATUS0_BC_LVL0 | FUSB302_STATUS0_BC_LVL1);
+    usart_printf("CC2 Sink BC_LVL: %02X\r\n", bc_lvl_cc2);
 
     // Convert bc_lvl to typec cc voltage
     *cc1 = bc_lvl_to_cc_voltage_snk(bc_lvl_cc1);
@@ -656,10 +657,10 @@ static void handle_command(char *line) {
                 usart_printf("No device detected on CC lines.\r\n");
             }
         } else if (strcmp(p, "fusb_measure_cc_pin_snk") == 0) {
-            int cc1, cc2;
+            uint8_t cc1, cc2;
             fusb_measure_cc_pin_snk(I2C1, &cc1, &cc2);
             usart_printf("---- CC Sink Measurements ----\r\n");
-            usart_printf("CC1: %02X, CC2: %02X\r\n");
+            usart_printf("CC1: 0x%02X, CC2: 0x%02X\r\n");
         } else if (strcmp(p, "fusb_get_chip_id") == 0) {
             uint8_t id = fusb_get_chip_id(I2C1);
             usart_printf("FUSB302 Chip ID (Reg: 0x01): 0x%02X\r\n", id);
