@@ -18,24 +18,13 @@
  * Globals
  * ------------------------------------------------------------ */
 
-volatile uint32_t system_millis = 0;
+volatile uint32_t system_millis;
+
 volatile bool fusb_event_pending = false;
 
 bool pd_monitor          = true;   /* basic logging */
 bool pd_sniffer_enabled  = true;   /* verbose sniffer */
 bool caps_received       = false;
-
-/* ------------------------------------------------------------
- * PD Message Container
- * ------------------------------------------------------------ */
-
-typedef struct {
-    uint16_t header;
-    uint32_t obj[7];
-} pd_msg_t;
-
-pd_msg_t last_caps;
-int last_pdo_count = 0;
 
 /* ------------------------------------------------------------
  * MCU Setup Functions
@@ -113,6 +102,18 @@ static void exti_setup(void) {
 }
 
 /* ------------------------------------------------------------
+ * PD Message Container
+ * ------------------------------------------------------------ */
+
+typedef struct {
+    uint16_t header;
+    uint32_t obj[7];
+} pd_msg_t;
+
+pd_msg_t last_caps;
+int last_pdo_count = 0;
+
+/* ------------------------------------------------------------
  * Low-level helpers
  * ------------------------------------------------------------ */
 
@@ -188,12 +189,11 @@ static inline bool fusb_rx_empty(void)
     return fusb_read(FUSB302_REG_STATUS1) & FUSB302_STATUS1_RX_EMPTY;
 }
 
-static void fusb_delay_us(uint32_t us) {
-    // At 48MHz, approximately 48 clock cycles per microsecond
-    // Using a simple busy-wait loop with NOP instructions
-    // Each NOP takes 1 cycle, loop overhead is minimal
-    for (uint32_t i = 0; i < us * 6; i++) {
-        __asm__("nop");
+static void fusb_delay_ms(uint32_t ms) {
+    // This assumes SysTick is running at 1ms intervals.
+    for (uint32_t i = 0; i < ms; i++) {
+        // Wait for the SysTick flag to be set (1ms elapsed)
+        while ((STK_CSR & STK_CSR_COUNTFLAG) == 0);
     }
 }
 
@@ -202,28 +202,38 @@ static void fusb_setup_sniffer() {
     
     // Reset the FUSB302
     fusb_write(FUSB302_REG_RESET, FUSB302_RESET_SW);
-    fusb_delay_us(10000);
+    fusb_delay_ms(2);
 
     // Power on
     fusb_write(FUSB302_REG_POWER, FUSB302_POWER_ALL_ON);
+    fusb_delay_ms(2);
+
+    // Enable SOP 
+    fusb_write(FUSB302_REG_CONTROL1, FUSB302_CTL1_ENSOP1 | FUSB302_CTL1_ENSOP2 | FUSB302_CTL1_RX_FLUSH);
+
+    // Accept SOP packets
+    fusb_write(FUSB302_REG_CONTROL2, FUSB302_CTL2_WAKE_EN | FUSB302_CTL2_TOGGLE);
 
     // Configure as sink (Rd on CC lines)
     fusb_write(FUSB302_REG_SWITCHES0, FUSB302_SW0_PDWN1 | FUSB302_SW0_PDWN1);
 
     // Enable CC comparators
-    fusb_write(FUSB302_REG_SWITCHES0, FUSB302_SW0_MEAS_CC1 | FUSB302_SW0_MEAS_CC2);
+    fusb_write(FUSB302_REG_SWITCHES0, FUSB302_SW0_MEAS_CC1 | FUSB302_SW0_MEAS_CC2 | FUSB302_SW0_PU_EN1 | FUSB302_SW0_PU_EN2);
 
-    // Configure Control1: Enable reception of all SOP packet types for sniffing:
-    // SOP', SOP'', SOP'_DEBUG, SOP''_DEBUG
-    fusb_write(FUSB302_REG_CONTROL1, FUSB302_CTL1_ENSOP1 | FUSB302_CTL1_ENSOP2 | FUSB302_CTL1_ENSOP1DB | FUSB302_CTL1_ENSOP2DB);
-
-    // Accept SOP packets
-    fusb_write(FUSB302_REG_CONTROL2, FUSB302_CTL2_WAKE_EN | FUSB302_CTL2_TOGGLE);
+    // Flush FIFO
+    fusb_write(FUSB302_REG_CONTROL0, FUSB302_CTL0_TX_FLUSH);
+    fusb_write(FUSB302_REG_CONTROL1, FUSB302_CTL1_RX_FLUSH);
 
     // Unmask all interrupts 
+    fusb_write(FUSB302_REG_MASK, 0x00);
     fusb_write(FUSB302_REG_MASKA, 0x00);
     fusb_write(FUSB302_REG_MASKB, 0x00);
-    fusb_delay_us(500);
+
+    // Clear pending interrupts
+    fusb_read(FUSB302_REG_INTERRUPT);
+    fusb_read(FUSB302_REG_INTERRUPTA);
+    fusb_read(FUSB302_REG_INTERRUPTB);
+    fusb_delay_ms(2);
 
     usart_printf("FUSB302 configured for PD Sniffing.\n");
 }
@@ -250,28 +260,52 @@ static bool read_pd_message(pd_msg_t *pd)
 {
     uint8_t tok;
 
-    /* Wait for SOP token */
-    fusb_read_fifo(&tok, 1);
-    if (!(tok & 0x80))   // not a token
-        return false;
+    /* ------------------------------------------------
+     * Token-aware RX FIFO parsing (FUSB302)
+     * ------------------------------------------------
+     * FIFO format:
+     *   SOP token
+     *   PACKSYM (header)
+     *   2-byte PD header
+     *   PACKSYM (data) [optional]
+     *   data objects    [optional]
+     *   EOP token
+     */
 
-    /* PACKSYM (header) */
+    // SOP token 
     fusb_read_fifo(&tok, 1);
-    if ((tok & 0xE0) != FUSB302_TX_TKN_PACKSYM)
+    if ((tok & 0xE0) != FUSB302_RX_TKN_SOP) {
         return false;
+    }
 
-    /* Header */
+    // PACKSYM for header
+    fusb_read_fifo(&tok, 1);
+    if ((tok & 0xE0) != FUSB302_RX_TKN_PACKSYM) {
+        return false;
+    }
+
+    // Read PD header
     uint8_t hdr[2];
     fusb_read_fifo(hdr, 2);
     pd->header = hdr[0] | (hdr[1] << 8);
 
-    int n = PD_HEADER_NUM_DATA_OBJECTS(pd->header);
+    int nobj = PD_HEADER_NUM_DATA_OBJECTS(pd->header);
+    if (nobj > 7)
+        nobj = 7; // safety clamp
 
-    /* PACKSYM (data) */
-    if (n > 0) {
-        fusb_read_fifo(&tok, 1);  // PACKSYM
-        fusb_read_fifo((uint8_t *)pd->obj, n * 4);
+    // Read data objects if present
+    if (nobj > 0) {
+        fusb_read_fifo(&tok, 1); // PACKSYM
+        if ((tok & 0xE0) != FUSB302_RX_TKN_PACKSYM) {
+            return false;
+        }
+        fusb_read_fifo((uint8_t *)pd->obj, nobj * 4);
     }
+
+    // Drain until EOP
+    do {
+        fusb_read_fifo(&tok, 1);
+    } while (~((tok & 0xE0) & FUSB302_RX_TKN_EOP));
 
     return true;
 }
@@ -311,10 +345,8 @@ static const char *pd_msg_name(uint8_t type, bool data)
 
 static void pd_sniffer_log(pd_msg_t *p)
 {
-    if (!pd_sniffer_enabled) {
-        usart_printf("Sniffer needs to be enabled.\r\n");
+    if (!pd_sniffer_enabled)
         return;
-    }
 
     uint8_t type  = PD_HEADER_MESSAGE_TYPE(p->header);
     uint8_t nobj  = PD_HEADER_NUM_DATA_OBJECTS(p->header);
@@ -428,7 +460,7 @@ static void handle_pd_message(pd_msg_t *p)
 
 static void handle_command(const char *cmd)
 {
-    if (!strcmp(cmd, "help")) {
+    if (strcmp(cmd, "help") == 0) {
         usart_printf(
             "help\r\n"
             "caps\r\n"
@@ -439,11 +471,11 @@ static void handle_command(const char *cmd)
             "reset\r\n"
         );
     }
-    else if (!strcmp(cmd, "caps")) {
+    else if (strcmp(cmd, "caps") == 0) {
         if (caps_received) pd_print_caps();
         else usart_printf("No caps received yet\r\n");
     }
-    else if (!strncmp(cmd, "req", 3)) {
+    else if (strncmp(cmd, "req", 3) == 0) {
         int v = atoi(cmd + 4);
         if (!caps_received) return;
         for (int i = 0; i < last_pdo_count; i++) {
@@ -455,12 +487,12 @@ static void handle_command(const char *cmd)
         }
         usart_printf("No matching PDO\r\n");
     }
-    else if (!strcmp(cmd, "monitor on"))  pd_monitor = true;
-    else if (!strcmp(cmd, "monitor off")) pd_monitor = false;
-    else if (!strcmp(cmd, "sniff on"))    pd_sniffer_enabled = true;
-    else if (!strcmp(cmd, "sniff off"))   pd_sniffer_enabled = false;
-    else if (!(strcmp(cmd, "status")))    fusb_get_status();
-    else if (!strcmp(cmd, "reset"))
+    else if (strcmp(cmd, "monitor on") == 0)  pd_monitor = true;
+    else if (strcmp(cmd, "monitor off") == 0) pd_monitor = false;
+    else if (strcmp(cmd, "sniff on") == 0)    pd_sniffer_enabled = true;
+    else if (strcmp(cmd, "sniff off") == 0)   pd_sniffer_enabled = false;
+    else if (strcmp(cmd, "status") == 0)      fusb_get_status();
+    else if (strcmp(cmd, "reset") == 0)
         fusb_write(FUSB302_REG_CONTROL3, FUSB302_CTL3_SEND_HARD_RESET);
     else
         usart_printf("Unknown command\r\n");
@@ -470,14 +502,14 @@ static void handle_command(const char *cmd)
  * EXTI ISR
  * ------------------------------------------------------------ */
 
-void exti4_15_isr(void)
+void exti9_5_isr(void)
 {
     if (exti_get_flag_status(EXTI8)) {
         exti_reset_request(EXTI8);
         fusb_event_pending = true;
-        usart_printf("INT!\r\n");
     }
 }
+
 
 /* ------------------------------------------------------------
  * Main
@@ -493,11 +525,12 @@ int main(void)
 
     fusb_setup_sniffer();
 
+    usart_printf("---- USB-PD Debugger / Sniffer ----\r\n> ");
+
     char line[32];
     int pos = 0;
 
     while (1) {
-        
         /* UART CLI (non-blocking) */
         if (uart_rx_ready()) {
             char c = usart_recv(USART2);
@@ -515,15 +548,12 @@ int main(void)
 
         /* USB-PD handling */
         if (fusb_event_pending) {
-            usart_printf("Event pending...\r\n");
+            fusb_event_pending = false;
             while (!fusb_rx_empty()) {
                 pd_msg_t msg;
                 if (read_pd_message(&msg))
                     handle_pd_message(&msg);
             }
-            fusb_event_pending = false;
         }
     }
-
-    return 0;
 }

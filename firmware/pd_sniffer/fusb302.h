@@ -293,6 +293,14 @@ enum fusb302_txfifo_tokens {
     FUSB302_TX_TKN_TXOFF = 0xFE,
 };
 
+enum fusb302_rxfifo_tokens {
+    FUSB302_RX_TKN_SOP = 0xE0,
+    FUSB302_RX_TKN_SOP1 = 0xC0,
+    FUSB302_RX_TKN_SOP2 = 0xA0,
+    FUSB302_RX_TKN_PACKSYM = 0x80,
+    FUSB302_RX_TKN_EOP = 0xD0,
+};
+
 /* -----------------------------------------------------------
  * Register structs for debugging (printing bits)
  * ----------------------------------------------------------- */
