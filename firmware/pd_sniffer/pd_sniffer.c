@@ -137,6 +137,20 @@ static void usart_printf(const char *format, ...) {
     }
 }
 
+static void print_byte_as_bits(uint8_t byte, uint8_t reg) {
+    usart_printf("Reg %02X: ", reg);
+    for (int i = 7; i >= 0; i--) { // Loop from most significant bit (7) to least significant (0)
+        // Use a bitwise AND with a mask to check if the current bit is set
+        // The mask is 1 shifted left by 'i' positions
+        if ((byte >> i) & 1) { 
+            usart_printf("1");
+        } else {
+            usart_printf("0");
+        }
+    }
+    usart_printf("\r\n");
+}
+
 static void hexdump(const uint8_t *data, size_t len) {
     for (size_t i = 0; i < len; i += 16) {
         usart_printf("%04X: ", (unsigned int)i);
@@ -209,16 +223,13 @@ static void fusb_setup_sniffer() {
     fusb_delay_ms(2);
 
     // Enable SOP 
-    fusb_write(FUSB302_REG_CONTROL1, FUSB302_CTL1_ENSOP1 | FUSB302_CTL1_ENSOP2 | FUSB302_CTL1_RX_FLUSH);
+    fusb_write(FUSB302_REG_CONTROL1, FUSB302_CTL1_ENSOP1 | FUSB302_CTL1_ENSOP2);
 
     // Accept SOP packets
     fusb_write(FUSB302_REG_CONTROL2, FUSB302_CTL2_WAKE_EN | FUSB302_CTL2_TOGGLE);
 
-    // Configure as sink (Rd on CC lines)
-    fusb_write(FUSB302_REG_SWITCHES0, FUSB302_SW0_PDWN1 | FUSB302_SW0_PDWN1);
-
     // Enable CC comparators
-    fusb_write(FUSB302_REG_SWITCHES0, FUSB302_SW0_MEAS_CC1 | FUSB302_SW0_MEAS_CC2 | FUSB302_SW0_PU_EN1 | FUSB302_SW0_PU_EN2);
+    fusb_write(FUSB302_REG_SWITCHES0, FUSB302_SW0_MEAS_CC1 | FUSB302_SW0_MEAS_CC2 | FUSB302_SW0_PDWN1 | FUSB302_SW0_PDWN1);
 
     // Flush FIFO
     fusb_write(FUSB302_REG_CONTROL0, FUSB302_CTL0_TX_FLUSH);
@@ -458,7 +469,7 @@ static void handle_pd_message(pd_msg_t *p)
  * CLI
  * ------------------------------------------------------------ */
 
-static void handle_command(const char *cmd)
+static void handle_command(char *cmd)
 {
     if (strcmp(cmd, "help") == 0) {
         usart_printf(
@@ -468,6 +479,8 @@ static void handle_command(const char *cmd)
             "monitor on|off\r\n"
             "sniff on|off\r\n"
             "status\r\n"
+            "r <reg>\r\n"
+            "w <reg> <val>\r\n"
             "reset\r\n"
         );
     }
@@ -487,13 +500,30 @@ static void handle_command(const char *cmd)
         }
         usart_printf("No matching PDO\r\n");
     }
+    else if (strcmp(cmd, "reset") == 0) {
+        fusb_write(FUSB302_REG_CONTROL3, FUSB302_CTL3_SEND_HARD_RESET);
+    }
+    else if (cmd[0] == 'r') {
+        uint8_t reg = (uint8_t)strtol(&cmd[1], NULL, 0);
+        uint8_t val = fusb_read(reg);
+        usart_printf("read[0x%02X] = 0x%02X\r\n", reg, val);
+        print_byte_as_bits(val, reg);
+    }
+    else if (cmd[0] == 'w') {
+        char *p = strtok(&cmd[1], " ");
+        if (!p) { usart_printf("usage: w <reg> <val>\r\n"); return; }
+        uint8_t reg = (uint8_t)strtol(p, NULL, 0);
+        p = strtok(NULL, " ");
+        if (!p) { usart_printf("usage: w <reg> <val>\r\n"); return; }
+        uint8_t val = (uint8_t)strtol(p, NULL, 0);
+        fusb_write(reg, val);
+        usart_printf("write[0x%02X] = 0x%02X\r\n", reg, val);
+    }
     else if (strcmp(cmd, "monitor on") == 0)  pd_monitor = true;
     else if (strcmp(cmd, "monitor off") == 0) pd_monitor = false;
     else if (strcmp(cmd, "sniff on") == 0)    pd_sniffer_enabled = true;
     else if (strcmp(cmd, "sniff off") == 0)   pd_sniffer_enabled = false;
     else if (strcmp(cmd, "status") == 0)      fusb_get_status();
-    else if (strcmp(cmd, "reset") == 0)
-        fusb_write(FUSB302_REG_CONTROL3, FUSB302_CTL3_SEND_HARD_RESET);
     else
         usart_printf("Unknown command\r\n");
 }
