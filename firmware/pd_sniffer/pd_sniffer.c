@@ -180,9 +180,10 @@ static inline bool uart_rx_ready(void)
     return usart_get_flag(USART2, USART_FLAG_RXNE);
 }
 
-static inline void fusb_write(uint8_t reg, uint8_t val)
+static void fusb_write(uint8_t reg, uint8_t val)
 {
-    i2c_transfer7(I2C1, FUSB302_ADDR, &reg, 1, &val, 1);
+    uint8_t tx_buf[2] = {reg, val};
+    i2c_transfer7(I2C1, FUSB302_ADDR, tx_buf, 2, NULL, 0);
 }
 
 static inline uint8_t fusb_read(uint8_t reg)
