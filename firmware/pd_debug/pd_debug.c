@@ -459,12 +459,10 @@ static void fusb_init_sink(uint32_t i2c) {
     fusb_full_reset(i2c);
     // Power on all blocks
     fusb_power_all(i2c);
-    // Auto-CRC, Use CC1 TX, Set Sink Role
-    uint8_t switches1 = FUSB302_SW1_AUTO_GCRC | FUSB302_SW1_SPECREV1 | FUSB302_SW1_SPECREV0;
-    fusb_write_reg(i2c, FUSB302_REG_SWITCHES1, switches1);
+    // Enable Auto-CRC, Set sink role
+    fusb_write_reg(i2c, FUSB302_REG_SWITCHES1, FUSB302_SW1_AUTO_GCRC | FUSB302_SW1_SPECREV1 | FUSB302_SW1_SPECREV0);
     // Toggle to detect CC and establish UFP (Sink)
-    uint8_t control2 = FUSB302_CTL2_MODE_UFP | FUSB302_CTL2_WAKE_EN | FUSB302_CTL2_TOGGLE;
-    fusb_write_reg(i2c, FUSB302_REG_CONTROL2, control2);
+    fusb_write_reg(i2c, FUSB302_REG_CONTROL2, FUSB302_CTL2_MODE_UFP | FUSB302_CTL2_WAKE_EN | FUSB302_CTL2_TOGGLE);
     usart_printf("FUSB302 initialized in Sink mode.\n");
 }
 
@@ -473,28 +471,31 @@ static void fusb_setup_sniffer(int32_t i2c) {
     
     // Reset the FUSB302
     fusb_write_reg(i2c, FUSB302_REG_RESET, FUSB302_RESET_SW | FUSB302_RESET_PD);
-    fusb_delay_ms(200);
+    fusb_delay_ms(2);
 
     // Power on
     fusb_write_reg(i2c, FUSB302_REG_POWER, FUSB302_POWER_ALL_ON);
+    fusb_delay_ms(2);
 
      // Configure Switches0: Enable measurement (passive detection) on CC1 and CC2
-    fusb_write_reg(i2c, FUSB302_REG_SWITCHES0, FUSB302_SW0_MEAS_CC1 | FUSB302_SW0_MEAS_CC2);
+    fusb_write_reg(i2c, FUSB302_REG_SWITCHES0, FUSB302_SW0_MEAS_CC1 | FUSB302_SW0_MEAS_CC2 | FUSB302_SW0_PDWN1 | FUSB302_SW0_PDWN2);
 
-    // Configure as sink (Rd on CC lines)
-    fusb_write_reg(i2c, FUSB302_REG_SWITCHES0, FUSB302_SW0_PDWN1 | FUSB302_SW0_PDWN1);
-
-    // Configure Control1: Enable reception of all SOP packet types for sniffing:
-    // SOP', SOP'', SOP'_DEBUG, SOP''_DEBUG
+    // Configure Control1: Enable reception of all SOP packets
     fusb_write_reg(i2c, FUSB302_REG_CONTROL1, FUSB302_CTL1_ENSOP1 | FUSB302_CTL1_ENSOP2 | FUSB302_CTL1_ENSOP1DB | FUSB302_CTL1_ENSOP2DB);
 
     // Accept SOP packets
     fusb_write_reg(i2c, FUSB302_REG_CONTROL2, FUSB302_CTL2_WAKE_EN | FUSB302_CTL2_TOGGLE);
 
-    // Unmask all interrupts 
+    // Unmask all interrupts
+    fusb_write_reg(i2c, FUSB302_REG_MASK, 0x00);
     fusb_write_reg(i2c, FUSB302_REG_MASKA, 0x00);
     fusb_write_reg(i2c, FUSB302_REG_MASKB, 0x00);
-    fusb_delay_ms(200);
+
+    // Clear interrupts
+    i2c_read_reg(FUSB302_REG_INTERRUPT);
+    i2c_read_reg(FUSB302_REG_INTERRUPTA);
+    i2c_read_reg(FUSB302_REG_INTERRUPTB);
+    fusb_delay_ms(2);
 
     usart_printf("FUSB302 configured for PD Sniffing.\n");
 }
