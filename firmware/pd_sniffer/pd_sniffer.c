@@ -533,11 +533,12 @@ static void handle_command(char *cmd)
  * EXTI ISR
  * ------------------------------------------------------------ */
 
-void exti9_5_isr(void)
+void exti4_15_isr(void)
 {
     if (exti_get_flag_status(EXTI8)) {
         exti_reset_request(EXTI8);
         fusb_event_pending = true;
+        usart_printf("INT_N triggered!\r\n");
     }
 }
 
