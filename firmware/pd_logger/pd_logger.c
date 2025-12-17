@@ -433,6 +433,7 @@ int main(void) {
     while (1) {
         uint8_t cc_lvl = fusb_measure_cc_pin_snk();
         usart_printf("CC Level: %02X\r\n", cc_lvl);
+        fusb_get_status();
         usart_printf("Enter to continue...\r\n");
         usart_getc();
     }
