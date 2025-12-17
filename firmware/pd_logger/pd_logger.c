@@ -271,9 +271,9 @@ static void fusb_setup_sniffer(void) {
     fusb_write(FUSB302_REG_MASKB, 0x00);
 
     // Clear interrupts
-    read_reg(FUSB302_REG_INTERRUPT);
-    read_reg(FUSB302_REG_INTERRUPTA);
-    read_reg(FUSB302_REG_INTERRUPTB);
+    fusb_read(FUSB302_REG_INTERRUPT);
+    fusb_read(FUSB302_REG_INTERRUPTA);
+    fusb_read(FUSB302_REG_INTERRUPTB);
     fusb_delay_ms(2);
 
     usart_printf("FUSB302 configured for PD Sniffing.\n");
