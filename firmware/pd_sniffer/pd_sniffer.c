@@ -20,12 +20,6 @@
 
 volatile uint32_t system_millis;
 
-volatile bool fusb_event_pending = false;
-
-bool pd_monitor          = true;   /* basic logging */
-bool pd_sniffer_enabled  = true;   /* verbose sniffer */
-bool caps_received       = false;
-
 /* ------------------------------------------------------------
  * MCU Setup Functions
  * ------------------------------------------------------------ */
@@ -357,9 +351,6 @@ static const char *pd_msg_name(uint8_t type, bool data)
 
 static void pd_sniffer_log(pd_msg_t *p)
 {
-    if (!pd_sniffer_enabled)
-        return;
-
     uint8_t type  = PD_HEADER_MESSAGE_TYPE(p->header);
     uint8_t nobj  = PD_HEADER_NUM_DATA_OBJECTS(p->header);
     bool data     = (nobj > 0);
@@ -454,79 +445,14 @@ static void handle_pd_message(pd_msg_t *p)
     uint8_t type = PD_HEADER_MESSAGE_TYPE(p->header);
 
     if (type == 1) {
-        caps_received = true;
         last_caps = *p;
         last_pdo_count = PD_HEADER_NUM_DATA_OBJECTS(p->header);
-        if (pd_monitor)
-            pd_print_caps();
+        pd_print_caps();
     }
-    else if (type == 3 && pd_monitor)
+    else if (type == 3)
         usart_printf("PD: ACCEPT\r\n");
-    else if (type == 6 && pd_monitor)
+    else if (type == 6)
         usart_printf("PD: PS_RDY\r\n");
-}
-
-/* ------------------------------------------------------------
- * CLI
- * ------------------------------------------------------------ */
-
-static void handle_command(char *cmd)
-{
-    if (strcmp(cmd, "help") == 0) {
-        usart_printf(
-            "help\r\n"
-            "caps\r\n"
-            "req 5|9|15|20\r\n"
-            "monitor on|off\r\n"
-            "sniff on|off\r\n"
-            "status\r\n"
-            "r <reg>\r\n"
-            "w <reg> <val>\r\n"
-            "reset\r\n"
-        );
-    }
-    else if (strcmp(cmd, "caps") == 0) {
-        if (caps_received) pd_print_caps();
-        else usart_printf("No caps received yet\r\n");
-    }
-    else if (strncmp(cmd, "req", 3) == 0) {
-        int v = atoi(cmd + 4);
-        if (!caps_received) return;
-        for (int i = 0; i < last_pdo_count; i++) {
-            int mv = ((last_caps.obj[i] >> 10) & 0x3FF) * 50;
-            if (mv / 1000 == v) {
-                pd_send_request(i, mv, 3000);
-                return;
-            }
-        }
-        usart_printf("No matching PDO\r\n");
-    }
-    else if (strcmp(cmd, "reset") == 0) {
-        fusb_write(FUSB302_REG_CONTROL3, FUSB302_CTL3_SEND_HARD_RESET);
-    }
-    else if (cmd[0] == 'r') {
-        uint8_t reg = (uint8_t)strtol(&cmd[1], NULL, 0);
-        uint8_t val = fusb_read(reg);
-        usart_printf("read[0x%02X] = 0x%02X\r\n", reg, val);
-        print_byte_as_bits(val, reg);
-    }
-    else if (cmd[0] == 'w') {
-        char *p = strtok(&cmd[1], " ");
-        if (!p) { usart_printf("usage: w <reg> <val>\r\n"); return; }
-        uint8_t reg = (uint8_t)strtol(p, NULL, 0);
-        p = strtok(NULL, " ");
-        if (!p) { usart_printf("usage: w <reg> <val>\r\n"); return; }
-        uint8_t val = (uint8_t)strtol(p, NULL, 0);
-        fusb_write(reg, val);
-        usart_printf("write[0x%02X] = 0x%02X\r\n", reg, val);
-    }
-    else if (strcmp(cmd, "monitor on") == 0)  pd_monitor = true;
-    else if (strcmp(cmd, "monitor off") == 0) pd_monitor = false;
-    else if (strcmp(cmd, "sniff on") == 0)    pd_sniffer_enabled = true;
-    else if (strcmp(cmd, "sniff off") == 0)   pd_sniffer_enabled = false;
-    else if (strcmp(cmd, "status") == 0)      fusb_get_status();
-    else
-        usart_printf("Unknown command\r\n");
 }
 
 /* ------------------------------------------------------------
@@ -535,10 +461,15 @@ static void handle_command(char *cmd)
 
 void exti4_15_isr(void)
 {
-    if (exti_get_flag_status(EXTI8)) {
-        exti_reset_request(EXTI8);
-        fusb_event_pending = true;
-        usart_printf("INT_N triggered!\r\n");
+    usart_printf("EXTI handler triggered!\r\n");
+    while (1) {
+        if (exti_get_flag_status(EXTI8)) {
+            exti_reset_request(EXTI8);
+            /* USB-PD handling */
+            pd_msg_t msg;
+            if (read_pd_message(&msg))
+                handle_pd_message(&msg);
+        }
     }
 }
 
@@ -557,35 +488,7 @@ int main(void)
 
     fusb_setup_sniffer();
 
-    usart_printf("---- USB-PD Debugger / Sniffer ----\r\n> ");
-
-    char line[32];
-    int pos = 0;
-
     while (1) {
-        /* UART CLI (non-blocking) */
-        if (uart_rx_ready()) {
-            char c = usart_recv(USART2);
-            if (c == '\r' || c == '\n') {
-                line[pos] = 0;
-                usart_printf("\r\n");
-                handle_command(line);
-                pos = 0;
-                usart_printf("> ");
-            } else if (pos < (int)sizeof(line) - 1) {
-                usart_send_blocking(USART2, c);
-                line[pos++] = c;
-            }
-        }
-
-        /* USB-PD handling */
-        if (fusb_event_pending) {
-            fusb_event_pending = false;
-            while (!fusb_rx_empty()) {
-                pd_msg_t msg;
-                if (read_pd_message(&msg))
-                    handle_pd_message(&msg);
-            }
-        }
+        // minimal main loop, most functionality in isr handler
     }
 }
