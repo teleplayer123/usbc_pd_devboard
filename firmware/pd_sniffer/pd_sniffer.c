@@ -471,7 +471,7 @@ void exti4_15_isr(void)
             pd_msg_t msg;
             if (read_pd_message(&msg))
                 handle_pd_message(&msg);
-            fusb_get_status();
+
             exti_reset_request(EXTI8);
         }
     }
@@ -493,6 +493,9 @@ int main(void)
     fusb_setup_sniffer();
 
     while (1) {
-        // minimal main loop, most functionality in isr handler
+        // debug in main loop
+        usart_printf("Systick: %02X\r\n", system_millis);
+        fusb_get_status();
+        fusb_delay_ms(3000);
     }
 }
