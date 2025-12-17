@@ -280,13 +280,16 @@ static bool read_pd_message(pd_msg_t *pd)
 
     // SOP token 
     fusb_read_fifo(&tok, 1);
+    usart_printf("PD Message Token: %02X\r\n", tok);
     if ((tok & 0xE0) != FUSB302_RX_TKN_SOP) {
+        usart_printf("SOP not as expected: %02X\r\n", (tok & 0xE0));
         return false;
     }
 
     // PACKSYM for header
     fusb_read_fifo(&tok, 1);
     if ((tok & 0xE0) != FUSB302_RX_TKN_PACKSYM) {
+        usart_printf("PACKSYM not as expected: %02X\r\n", (tok & 0xE0));
         return false;
     }
 
@@ -303,7 +306,7 @@ static bool read_pd_message(pd_msg_t *pd)
     if (nobj > 0) {
         fusb_read_fifo(&tok, 1); // PACKSYM
         if ((tok & 0xE0) != FUSB302_RX_TKN_PACKSYM) {
-            return false;
+            usart_printf("PACKSYM not as expected: %02X\r\n", (tok & 0xE0));
         }
         fusb_read_fifo((uint8_t *)pd->obj, nobj * 4);
     }
@@ -464,11 +467,12 @@ void exti4_15_isr(void)
     usart_printf("EXTI handler triggered!\r\n");
     while (1) {
         if (exti_get_flag_status(EXTI8)) {
-            exti_reset_request(EXTI8);
             /* USB-PD handling */
             pd_msg_t msg;
             if (read_pd_message(&msg))
                 handle_pd_message(&msg);
+            fusb_get_status();
+            exti_reset_request(EXTI8);
         }
     }
 }
