@@ -313,7 +313,7 @@ static int fusb_measure_cc_pin_src(uint8_t cc_reg) {
     // Set MDAC to default value
     uint8_t mdac = FUSB302_MEAS_MDAC_MV(PD_SRC_DEF_MV);
     fusb_write(FUSB302_REG_MEASURE, mdac);
-    fusb_delay_ms(25);
+    fusb_delay_ms(2);
     // Read status register
     reg = fusb_read(FUSB302_REG_STATUS0);
     // Assume open
@@ -321,7 +321,7 @@ static int fusb_measure_cc_pin_src(uint8_t cc_reg) {
     // CC voltage below no connect threshold
     if ((reg & FUSB302_STATUS0_COMP) == 0) {
         fusb_write(FUSB302_REG_MEASURE, PD_SRC_DEF_RD_MV);
-        fusb_delay_ms(25);
+        fusb_delay_ms(2);
 
         // Read status register
         reg = fusb_read(FUSB302_REG_STATUS0);
@@ -354,9 +354,9 @@ static uint8_t fusb_measure_cc_pin_snk(void) {
     reg |= FUSB302_SW0_MEAS_CC1;
     fusb_write(FUSB302_REG_SWITCHES0, reg);
     // Wait for measurement
-    fusb_delay_us(25);
+    fusb_delay_ms(2);
     // Read cc1 measurement
-    bc_lvl_cc1 = fusb_read_reg(FUSB302_REG_STATUS0);
+    bc_lvl_cc1 = fusb_read(FUSB302_REG_STATUS0);
     // Mask unwanted bits
     bc_lvl_cc1 &= (FUSB302_STATUS0_BC_LVL0 | FUSB302_STATUS0_BC_LVL1);
     usart_printf("CC1 Sink BC_LVL: %02X\r\n", bc_lvl_cc1);
@@ -368,7 +368,7 @@ static uint8_t fusb_measure_cc_pin_snk(void) {
     reg |= FUSB302_SW0_MEAS_CC2;
     fusb_write(FUSB302_REG_SWITCHES0, reg);
     // Wait on measurement
-    fusb_delay_us(25);
+    fusb_delay_ms(2);
     // Read cc2 measurement
     bc_lvl_cc2 = fusb_read(FUSB302_REG_STATUS0);
     // Mask unwanted bits
