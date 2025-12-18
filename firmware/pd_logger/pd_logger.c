@@ -29,7 +29,8 @@ void sys_tick_handler(void)
     system_millis++;
 }
 
-static void clock_setup(void) {
+static void clock_setup(void)
+{
     rcc_clock_setup_in_hsi_out_48mhz();
     rcc_periph_clock_enable(RCC_GPIOA);
     rcc_periph_clock_enable(RCC_GPIOB);
@@ -37,7 +38,8 @@ static void clock_setup(void) {
     rcc_periph_clock_enable(RCC_I2C1);
 }
 
-static void usart_setup(void) {
+static void usart_setup(void)
+{
     gpio_mode_setup(GPIOA, GPIO_MODE_AF, GPIO_PUPD_NONE, GPIO2 | GPIO3);
     gpio_set_af(GPIOA, GPIO_AF1, GPIO2 | GPIO3);
     // usart_disable(USART2);
@@ -50,7 +52,8 @@ static void usart_setup(void) {
     usart_enable(USART2);
 }
 
-static void i2c_setup(void) {
+static void i2c_setup(void)
+{
     gpio_mode_setup(GPIOB, GPIO_MODE_AF, GPIO_PUPD_NONE, GPIO6 | GPIO7);
     gpio_set_output_options(GPIOB, GPIO_OTYPE_OD, GPIO_OSPEED_25MHZ, GPIO6 | GPIO7);
     gpio_set_af(GPIOB, GPIO_AF1, GPIO6 | GPIO7);
@@ -74,7 +77,8 @@ static void systick_setup(void)
     systick_interrupt_enable();
 }
 
-static void exti_setup(void) {
+static void exti_setup(void)
+{
     // FUSB302 INT_N is connected to PB8
     // We need to enable the clock for SYSCFG to configure EXTI.
     rcc_periph_clock_enable(RCC_SYSCFG_COMP);
@@ -100,21 +104,25 @@ static void exti_setup(void) {
  * ------------------------------------------------------------ */
 
 /* simple blocking getchar/putchar */
-int _write(int fd, char *ptr, int len) {
+int _write(int fd, char *ptr, int len)
+{
     (void)fd;
     for (int i=0; i<len; i++) usart_send_blocking(USART2, ptr[i]);
     return len;
 }
 
-static void usart_send_char(char c) {
+static void usart_send_char(char c)
+{
     usart_send_blocking(USART2, c);
 }
 
-static char usart_getc(void) { 
+static char usart_getc(void)
+{ 
     return usart_recv_blocking(USART2); 
 }
 
-static void usart_printf(const char *format, ...) {
+static void usart_printf(const char *format, ...)
+{
     char buf[2048];
     va_list args;
     va_start(args, format);
@@ -130,7 +138,8 @@ static void usart_printf(const char *format, ...) {
     }
 }
 
-static void print_byte_as_bits(uint8_t byte, uint8_t reg) {
+static void print_byte_as_bits(uint8_t byte, uint8_t reg)
+{
     usart_printf("Reg %02X: ", reg);
     for (int i = 7; i >= 0; i--) { // Loop from most significant bit (7) to least significant (0)
         // Use a bitwise AND with a mask to check if the current bit is set
@@ -144,7 +153,18 @@ static void print_byte_as_bits(uint8_t byte, uint8_t reg) {
     usart_printf("\r\n");
 }
 
-static void hexdump(const uint8_t *data, size_t len) {
+static void dump_bits(uint8_t reg, const struct bit_name *tbl)
+{
+    for (int i = 0; i <= 7; i++) {
+        if (tbl[i].name == NULL)
+            continue;  // skip unused bits             
+
+        usart_printf("%s = %d\n", tbl[i].name, !!(reg & tbl[i].mask));
+    }
+}
+
+static void hexdump(const uint8_t *data, size_t len)
+{
     for (size_t i = 0; i < len; i += 16) {
         usart_printf("%04X: ", (unsigned int)i);
         
@@ -200,12 +220,13 @@ static inline void fusb_read_fifo(uint8_t *buf, int len)
  * FUSB302 functions
  * ------------------------------------------------------------ */
 
-static inline bool fusb_rx_empty(void)
+static inline bool fusb_rx_empty(void) 
 {
     return fusb_read(FUSB302_REG_STATUS1) & FUSB302_STATUS1_RX_EMPTY;
 }
 
-static void fusb_delay_ms(uint32_t ms) {
+static void fusb_delay_ms(uint32_t ms)
+{
     // This assumes SysTick is running at 1ms intervals.
     for (uint32_t i = 0; i < ms; i++) {
         // Wait for the SysTick flag to be set (1ms elapsed)
@@ -213,27 +234,32 @@ static void fusb_delay_ms(uint32_t ms) {
     }
 }
 
-static void fusb_reset(void) {
+static void fusb_reset(void)
+{
     fusb_write(FUSB302_REG_RESET, FUSB302_RESET_SW);
     fusb_delay_ms(2);
 }
 
-static void fusb_pd_reset(void) {
+static void fusb_pd_reset(void)
+{
     fusb_write(FUSB302_REG_RESET, FUSB302_RESET_PD);
     fusb_delay_ms(2);
 }
 
-static void fusb_full_reset(void) {
+static void fusb_full_reset(void)
+{
     fusb_write(FUSB302_REG_RESET, FUSB302_RESET_SW | FUSB302_RESET_PD);
     fusb_delay_ms(2);
 }
 
-static void fusb_power_all(void) {
+static void fusb_power_all(void)
+{
     fusb_write(FUSB302_REG_POWER, FUSB302_POWER_ALL_ON);
     fusb_delay_ms(1);
 }
 
-static void fusb_init_sink(void) {
+static void fusb_init_sink(void)
+{
     // Reset FUSB302
     fusb_reset();
     // Power on all blocks
@@ -245,7 +271,8 @@ static void fusb_init_sink(void) {
     usart_printf("FUSB302 initialized in Sink mode.\n");
 }
 
-static void fusb_setup_sniffer(void) {    
+static void fusb_setup_sniffer(void)
+{    
     usart_printf("Initializing FUSB302 for PD Sniffing...\n");
     
     // Reset the FUSB302
@@ -279,13 +306,22 @@ static void fusb_setup_sniffer(void) {
     usart_printf("FUSB302 configured for PD Sniffing.\n");
 }
 
-static void check_rx_buffer(void) {
+static void fusb_check_status_regs(void)
+{
+    uint8_t reg;
+    reg = fusb_read(FUSB302_REG_STATUS0);
+    dump_bits(reg, fusb302_status0_bits);
+}
+
+static void check_rx_buffer(void)
+{
     uint8_t rx_buffer[80];
     fusb_read_fifo(rx_buffer, 80);
     hexdump(rx_buffer, 80);
 }
 
-static void fusb_get_status(void) {
+static void fusb_get_status(void)
+{
     uint8_t st0 = fusb_read(FUSB302_REG_STATUS0);
     uint8_t st1 = fusb_read(FUSB302_REG_STATUS1);
     usart_printf("FUSB STATUS0=0x%02X STATUS1=0x%02X\r\n", st0, st1);
@@ -293,7 +329,8 @@ static void fusb_get_status(void) {
     usart_printf("INT pin=%02X\r\n", gpio_get(GPIOB, GPIO8) ? 1 : 0);
 }
 
-static int fusb_measure_cc_pin_src(uint8_t cc_reg) {
+static int fusb_measure_cc_pin_src(uint8_t cc_reg)
+{
     // Read status from switches0 register
     uint8_t reg, sw0_orig, cc_lvl;
     reg = fusb_read(FUSB302_REG_SWITCHES0);
@@ -333,7 +370,8 @@ static int fusb_measure_cc_pin_src(uint8_t cc_reg) {
     return cc_lvl;
 }
 
-static uint8_t fusb_measure_cc_pin_snk(void) {
+static uint8_t fusb_measure_cc_pin_snk(void)
+{
     uint8_t reg, orig_cc1, orig_cc2, bc_lvl_cc1, bc_lvl_cc2, cc_lvl;
 
     // Measure cc1
@@ -398,7 +436,8 @@ static uint8_t fusb_measure_cc_pin_snk(void) {
     return cc_lvl;
 }
 
-static void fusb_enable_gcrc(bool enable) {
+static void fusb_enable_gcrc(bool enable)
+{
     // AUTO_GCRC is in SWITCHES1 register
     uint8_t reg = fusb_read(FUSB302_REG_SWITCHES1);
     if (enable) {
@@ -408,7 +447,8 @@ static void fusb_enable_gcrc(bool enable) {
     }
 }
 
-static int fusb_check_cc_lines_src(void) {
+static int fusb_check_cc_lines_src(void)
+{
     int ret = 0;
     fusb_power_all();
     int cc1_lvl = fusb_measure_cc_pin_src(FUSB302_SW0_MEAS_CC1);
@@ -421,7 +461,8 @@ static int fusb_check_cc_lines_src(void) {
     return ret;
 }
 
-int main(void) {
+int main(void)
+{
     clock_setup();
     systick_setup();
     usart_setup();
@@ -436,6 +477,7 @@ int main(void) {
         uint8_t cc = fusb_check_cc_lines_src();
         usart_printf("Source CC pin: %02X\r\n", cc);
         fusb_get_status();
+        fusb_check_status_regs();
         usart_printf("Enter to continue...\r\n");
         usart_getc();
     }
