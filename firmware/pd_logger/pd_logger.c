@@ -310,17 +310,25 @@ static void fusb_check_status_regs(void)
 {
     uint8_t reg;
     // Read and print status0 bits
+    usart_printf("---- STATUS0 ----\r\n");
     reg = fusb_read(FUSB302_REG_STATUS0);
     dump_bits(reg, fusb302_status0_bits);
+    usart_printf("\r\n");
     // Read and print status1 bits
+    usart_printf("---- STATUS1 ----\r\n");
     reg = fusb_read(FUSB302_REG_STATUS1);
     dump_bits(reg, fusb302_status1_bits);
+    usart_printf("\r\n");
     // Read and print status0a bits
+    usart_printf("---- STATUS0A ----\r\n");
     reg = fusb_read(FUSB302_REG_STATUS0A);
     dump_bits(reg, fusb302_status0a_bits);
+    usart_printf("\r\n");
     // Read and print status1a bits
+    usart_printf("---- STATUS1A ----\r\n");
     reg = fusb_read(FUSB302_REG_STATUS1A);
     dump_bits(reg, fusb302_status1a_bits);
+    usart_printf("\r\n");
 }
 
 static void check_rx_buffer(void)
