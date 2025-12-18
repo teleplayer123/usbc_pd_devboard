@@ -496,7 +496,6 @@ int main(void)
         usart_printf("Source CC pin: %02X\r\n", cc_pin);
         fusb_get_status();
         fusb_check_status_regs();
-        usart_printf("Enter to continue...\r\n");
-        usart_getc();
+        fusb_delay_ms(5);
     }
 }
