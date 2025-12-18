@@ -309,8 +309,18 @@ static void fusb_setup_sniffer(void)
 static void fusb_check_status_regs(void)
 {
     uint8_t reg;
+    // Read and print status0 bits
     reg = fusb_read(FUSB302_REG_STATUS0);
     dump_bits(reg, fusb302_status0_bits);
+    // Read and print status1 bits
+    reg = fusb_read(FUSB302_REG_STATUS1);
+    dump_bits(reg, fusb302_status1_bits);
+    // Read and print status0a bits
+    reg = fusb_read(FUSB302_REG_STATUS0A);
+    dump_bits(reg, fusb302_status0a_bits);
+    // Read and print status1a bits
+    reg = fusb_read(FUSB302_REG_STATUS1A);
+    dump_bits(reg, fusb302_status1a_bits);
 }
 
 static void check_rx_buffer(void)
@@ -474,8 +484,8 @@ int main(void)
     while (1) {
         uint8_t cc_lvl = fusb_measure_cc_pin_snk();
         usart_printf("Sink CC Level: %02X\r\n", cc_lvl);
-        uint8_t cc = fusb_check_cc_lines_src();
-        usart_printf("Source CC pin: %02X\r\n", cc);
+        uint8_t cc_pin = fusb_check_cc_lines_src();
+        usart_printf("Source CC pin: %02X\r\n", cc_pin);
         fusb_get_status();
         fusb_check_status_regs();
         usart_printf("Enter to continue...\r\n");
