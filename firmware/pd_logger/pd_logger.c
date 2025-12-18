@@ -428,11 +428,13 @@ int main(void) {
     i2c_setup();
     exti_setup(); 
 
-    fusb_init_sink();
+    fusb_setup_sniffer();
 
     while (1) {
         uint8_t cc_lvl = fusb_measure_cc_pin_snk();
-        usart_printf("CC Level: %02X\r\n", cc_lvl);
+        usart_printf("Sink CC Level: %02X\r\n", cc_lvl);
+        uint8_t cc = fusb_check_cc_lines_src();
+        usart_printf("Source CC pin: %02X\r\n", cc);
         fusb_get_status();
         usart_printf("Enter to continue...\r\n");
         usart_getc();
