@@ -530,14 +530,6 @@ static void fusb_measure_cc_pin_snk(uint8_t *cc1, uint8_t *cc2)
     fusb_write(FUSB302_REG_SWITCHES0, reg);
 }
 
-static void fusb_get_cc(int *cc1, int *cc2)
-{
-    if (state.pulling_up) {
-        // source
-        fusb_measure_cc_pin_src()
-    }
-}
-
 static void fusb_enable_gcrc(bool enable)
 {
     // AUTO_GCRC is in SWITCHES1 register
@@ -581,6 +573,17 @@ static void fusb_detect_cc_pin_src(uint8_t *cc1, uint8_t *cc2)
         // measure both cc pins if vconn not enabled
         *cc1 = fusb_measure_cc_pin_src(cc1_meas);
         *cc2 = fusb_measure_cc_pin_src(cc2_meas);
+    }
+}
+
+static void fusb_get_cc(int *cc1, int *cc2)
+{
+    if (state.pulling_up) {
+        // source
+        fusb_detect_cc_pin_src(cc1, cc2);
+    } else {
+        // sink
+        fusb_measure_cc_pin_snk(cc1, cc2);
     }
 }
 
