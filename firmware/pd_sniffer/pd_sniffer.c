@@ -35,6 +35,7 @@ static void clock_setup(void) {
     rcc_periph_clock_enable(RCC_GPIOB);
     rcc_periph_clock_enable(RCC_USART2);
     rcc_periph_clock_enable(RCC_I2C1);
+    rcc_periph_clock_enable(RCC_SYSCFG_COMP);
 }
 
 static void usart_setup(void) {
@@ -75,10 +76,6 @@ static void systick_setup(void)
 }
 
 static void exti_setup(void) {
-    // FUSB302 INT_N is connected to PB8
-    // We need to enable the clock for SYSCFG to configure EXTI.
-    rcc_periph_clock_enable(RCC_SYSCFG_COMP);
-    
     // Map PB8 to EXTI8
     exti_select_source(EXTI8, GPIOB);
 
