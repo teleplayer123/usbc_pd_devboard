@@ -280,12 +280,15 @@
 #define BIT(x) (1 << (x))
 #define PD_SRC_DEF_MV               1600
 #define PD_SRC_DEF_RD_MV            200
-#define	TYPEC_CC_VOLT_OPEN          0
-#define TYPEC_CC_VOLT_SNK_DEF       5
-#define TYPEC_CC_VOLT_SNK_MED       6
-#define TYPEC_CC_VOLT_SNK_HIGH      7
-#define	TYPEC_CC_VOLT_RA            1
-#define	TYPEC_CC_VOLT_RD            2
+
+enum tcpc_cc_voltage_status {
+	TYPEC_CC_VOLT_OPEN = 0,
+	TYPEC_CC_VOLT_RA = 1,
+	TYPEC_CC_VOLT_RD = 2,
+	TYPEC_CC_VOLT_SNK_DEF = 5,
+	TYPEC_CC_VOLT_SNK_1_5 = 6,
+	TYPEC_CC_VOLT_SNK_3_0 = 7,
+};
 
 typedef struct {
     uint16_t header;

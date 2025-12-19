@@ -353,6 +353,27 @@ static void fusb_get_status(void)
     usart_printf("INT pin=%02X\r\n", gpio_get(GPIOB, GPIO8) ? 1 : 0);
 }
 
+static int convert_bc_lvl(int bc_lvl, bool is_sink)
+{
+    int tc_lvl = TYPEC_CC_VOLT_OPEN;
+    if (is_sink) {
+        if (bc_lvl == 0x00) {
+            tc_lvl = TYPEC_CC_VOLT_RA;
+        } else if (bc_lvl < 0x03) {
+            tc_lvl = TYPEC_CC_VOLT_RD;
+        }
+    } else {
+        if (bc_lvl == 0x01) {
+            tc_lvl = TYPEC_CC_VOLT_SNK_DEF;
+        } else if (bc_lvl == 0x02) {
+            tc_lvl = TYPEC_CC_VOLT_SNK_1_5;
+        } else if (bc_lvl == 0x03) {
+            tc_lvl = TYPEC_CC_VOLT_SNK_3_0;
+        }
+    }
+    return tc_lvl;
+}
+
 static int fusb_measure_cc_pin_src(uint8_t cc_reg)
 {
     // Read status from switches0 register
@@ -394,9 +415,9 @@ static int fusb_measure_cc_pin_src(uint8_t cc_reg)
     return cc_lvl;
 }
 
-static uint8_t fusb_measure_cc_pin_snk(void)
+static void fusb_measure_cc_pin_snk(uint8_t *cc1, uint8_t *cc2)
 {
-    uint8_t reg, orig_cc1, orig_cc2, bc_lvl_cc1, bc_lvl_cc2, cc_lvl;
+    uint8_t reg, orig_cc1, orig_cc2, bc_lvl_cc1, bc_lvl_cc2;
 
     // Measure cc1
     reg = fusb_read(FUSB302_REG_SWITCHES0);
@@ -437,11 +458,8 @@ static uint8_t fusb_measure_cc_pin_snk(void)
     bc_lvl_cc2 &= (FUSB302_STATUS0_BC_LVL0 | FUSB302_STATUS0_BC_LVL1);
     usart_printf("CC2 Sink BC_LVL: %02X\r\n", bc_lvl_cc2);
 
-    if (bc_lvl_cc1 > bc_lvl_cc2) {
-        cc_lvl = bc_lvl_cc1;
-    } else {
-        cc_lvl = bc_lvl_cc2;
-    }
+    *cc1 = convert_bc_lvl(bc_lvl_cc1, true);
+    *cc2 = convert_bc_lvl(bc_lvl_cc2, true);
 
     // Reset MEAS switches to original state
     reg = fusb_read(FUSB302_REG_SWITCHES0);
@@ -456,8 +474,6 @@ static uint8_t fusb_measure_cc_pin_snk(void)
         reg &= ~FUSB302_SW0_MEAS_CC2;
     }
     fusb_write(FUSB302_REG_SWITCHES0, reg);
-
-    return cc_lvl;
 }
 
 static void fusb_enable_gcrc(bool enable)
@@ -471,10 +487,9 @@ static void fusb_enable_gcrc(bool enable)
     }
 }
 
-static int fusb_check_cc_lines_src(void)
+static int fusb_check_cc_pin_src(void)
 {
     int ret = 0;
-    fusb_power_all();
     int cc1_lvl = fusb_measure_cc_pin_src(FUSB302_SW0_MEAS_CC1);
     int cc2_lvl = fusb_measure_cc_pin_src(FUSB302_SW0_MEAS_CC2);
     if (cc1_lvl != TYPEC_CC_VOLT_OPEN && cc2_lvl == TYPEC_CC_VOLT_OPEN) {
@@ -483,6 +498,13 @@ static int fusb_check_cc_lines_src(void)
         ret = 2; // Device detected on CC2
     }
     return ret;
+}
+
+static void fusb_check_cc_pin_snk(void)
+{
+    uint8_t cc1, cc2;
+    fusb_measure_cc_pin_snk(&cc1, &cc2);
+    usart_printf("Sink CC1: 0x%02X CC2: 0x%02X\r\n");
 }
 
 int main(void)
@@ -496,9 +518,8 @@ int main(void)
     fusb_setup_sniffer();
 
     while (1) {
-        uint8_t cc_lvl = fusb_measure_cc_pin_snk();
-        usart_printf("Sink CC Level: %02X\r\n", cc_lvl);
-        uint8_t cc_pin = fusb_check_cc_lines_src();
+        fusb_check_cc_pin_snk();
+        uint8_t cc_pin = fusb_check_cc_pin_src();
         usart_printf("Source CC pin: %02X\r\n", cc_pin);
         fusb_get_status();
         fusb_check_status_regs();
