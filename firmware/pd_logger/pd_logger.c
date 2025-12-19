@@ -312,6 +312,55 @@ static void fusb_setup_sniffer(void)
     usart_printf("FUSB302 configured for PD Sniffing.\n");
 }
 
+static void fusb_setup(void)
+{
+    uint8_t reg;
+
+    // Reset FUSB302
+    fusb_reset();
+
+    // Turn on retries and set number of retries
+    reg = fusb_read(FUSB302_REG_CONTROL3);
+    reg |= (FUSB302_CTL3_AUTO_RETRY | FUSB302_CTL3_NRETRIES_MASK);
+    fusb_write(FUSB302_REG_CONTROL3, reg);
+
+    // Create interrupt masks
+    reg = 0xFF;
+    // CC level changes
+    reg &= ~FUSB302_MASK_BC_LVL;
+    // Collisions
+    reg &= ~FUSB302_MASK_COLLISION;
+    // Alert
+    reg &= ~FUSB302_MASK_ALERT;
+    // Packet received with correct crc
+    reg &= ~FUSB302_MASK_CRC_CHK;
+    fusb_write(FUSB302_REG_MASK, reg);
+
+    // MaskA reg masks
+    reg = 0xFF;
+    reg &= ~FUSB302_MASKA_RETRYFAIL;
+    reg &= ~FUSB302_MASKA_HARDSENT;
+    reg &= ~FUSB302_MASKA_TXSENT;
+    reg &= ~FUSB302_MASKA_HARDRST;
+    fusb_write(FUSB302_REG_MASKA, reg);
+    
+    // Mask GoodCRC to ack pd message
+    reg = 0xFF;
+    reg &= ~FUSB302_MASKB_GCRCSENT;
+    fusb_write(FUSB302_REG_MASKB, reg);
+
+    // Enable interrupt
+    reg = fusb_read(FUSB302_REG_CONTROL0);
+    reg &= ~FUSB302_CTL0_INT_MASK;
+    fusb_write(FUSB302_REG_CONTROL0, reg);
+
+    // Set VCONN switch defaults
+    // TODO
+
+    // Power all
+    fusb_power_all();
+}
+
 static void fusb_check_status_regs(void)
 {
     uint8_t reg;

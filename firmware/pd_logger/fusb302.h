@@ -280,6 +280,7 @@
 #define BIT(x) (1 << (x))
 #define PD_SRC_DEF_MV               1600
 #define PD_SRC_DEF_RD_MV            200
+#define PD_RETRY_COUNT              3
 
 enum tcpc_cc_voltage_status {
 	TYPEC_CC_VOLT_OPEN = 0,
