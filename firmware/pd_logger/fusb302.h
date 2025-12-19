@@ -291,6 +291,13 @@ enum tcpc_cc_voltage_status {
 	TYPEC_CC_VOLT_SNK_3_0 = 7,
 };
 
+enum tcpc_cc_pull {
+	TYPEC_CC_RA = 0,
+	TYPEC_CC_RP = 1,
+	TYPEC_CC_RD = 2,
+	TYPEC_CC_OPEN = 3,
+};
+
 typedef struct {
     uint16_t header;
     uint32_t obj[7];

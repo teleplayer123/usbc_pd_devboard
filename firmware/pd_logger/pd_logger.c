@@ -608,6 +608,55 @@ static void fusb_check_cc_pin_snk(void)
     usart_printf("Sink CC1: 0x%02X CC2: 0x%02X\r\n");
 }
 
+static int fusb_set_cc(int pull)
+{
+    uint8_t reg;
+
+    switch (pull) {
+        case TYPEC_CC_RP:
+            reg = fusb_read(FUSB302_REG_SWITCHES0);
+            // enable needed pull-up
+            reg &= ~(FUSB302_SW0_PU_EN1 | FUSB302_SW0_PU_EN2 | FUSB302_SW0_PDWN1 | FUSB302_SW0_PDWN2 | FUSB302_SW0_VCONN_CC1 | FUSB302_SW0_VCONN_CC2);
+            reg |= (FUSB302_SW0_PU_EN1 | FUSB302_SW0_PU_EN2);
+
+            if (state.vconn_enabled) {
+                reg |= state.cc_polarity ? FUSB302_SW0_VCONN_CC1 : FUSB302_SW0_VCONN_CC2;
+            }
+            fusb_write(FUSB302_REG_SWITCHES0, reg);
+            state.pulling_up = 1;
+            break;
+        case TYPEC_CC_RD:
+            // enable UFP mode
+            // turn off toggle
+            reg = fusb_read(FUSB302_REG_CONTROL2);
+            reg &= ~(FUSB302_CTL2_TOGGLE);
+            fusb_write(FUSB302_REG_CONTROL2, reg);
+            
+            // enable pull-downs and disable pull-ups
+            reg = fusb_read(FUSB302_REG_SWITCHES0);
+            reg &= ~(FUSB302_SW0_PU_EN1 | FUSB302_SW0_PU_EN2);
+            reg |= (FUSB302_SW0_PDWN1 | FUSB302_SW0_PDWN2);
+            fusb_write(FUSB302_REG_SWITCHES0, reg);
+            state.pulling_up = 0;
+            break;
+        case TYPEC_CC_OPEN:
+            // disable toggle
+            reg = fusb_read(FUSB302_REG_CONTROL2);
+            reg &= ~(FUSB302_CTL2_TOGGLE);
+            fusb_write(FUSB302_REG_CONTROL2, reg);
+            // manual switches must be open
+            reg = fusb_read(FUSB302_REG_SWITCHES0);
+            reg &= ~(FUSB302_SW0_PU_EN1 | FUSB302_SW0_PU_EN2 | FUSB302_SW0_PDWN1 | FUSB302_SW0_PDWN2);
+            fusb_write(FUSB302_REG_SWITCHES0, reg);
+            state.pulling_up = 0;
+            break;
+        default:
+            // unsupported
+            return -1;
+    }
+    return 0;
+}
+
 // function to print status info for debugging
 static void fusb_get_status(void)
 {
