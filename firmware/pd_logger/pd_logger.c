@@ -282,15 +282,15 @@ static void fusb_setup_sniffer(void)
     usart_printf("Initializing FUSB302 for PD Sniffing...\n");
     
     // Reset the FUSB302
-    fusb_write(FUSB302_REG_RESET, FUSB302_RESET_SW);
-    fusb_delay_ms(2);
+    fusb_reset();
 
     // Power on
-    fusb_write(FUSB302_REG_POWER, FUSB302_POWER_ALL_ON);
-    fusb_delay_ms(2);
+    fusb_power_all();
 
-     // Configure Switches0: Enable measurement (passive detection) on CC1 and CC2
-    fusb_write(FUSB302_REG_SWITCHES0, FUSB302_SW0_MEAS_CC1 | FUSB302_SW0_MEAS_CC2);
+    // Configure Switches0: Enable measurement (passive detection) on CC1 and CC2
+    uint8_t reg = fusb_read(FUSB302_REG_SWITCHES0);
+    reg |= (FUSB302_SW0_MEAS_CC1 | FUSB302_SW0_MEAS_CC2);
+    fusb_write(FUSB302_REG_SWITCHES0, reg);
 
     // Configure Control1: Enable reception of all SOP packets
     fusb_write(FUSB302_REG_CONTROL1, FUSB302_CTL1_ENSOP1 | FUSB302_CTL1_ENSOP2 | FUSB302_CTL1_ENSOP1DB | FUSB302_CTL1_ENSOP2DB);
@@ -355,7 +355,7 @@ static void fusb_setup(void)
     fusb_write(FUSB302_REG_CONTROL0, reg);
 
     // Set VCONN switch defaults
-    // TODO
+    // TODO implement struct to hold state for polarity, vconn, etc.
 
     // Power all
     fusb_power_all();
