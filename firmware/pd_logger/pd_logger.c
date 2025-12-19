@@ -20,6 +20,16 @@
 
 volatile uint32_t system_millis;
 
+static struct fusb302_chip_state {
+	int cc_polarity;
+	int vconn_enabled;
+	/* 1 = pulling up (DFP) 0 = pulling down (UFP) */
+	int pulling_up;
+	int rx_enable;
+	uint8_t mdac_vnc;
+	uint8_t mdac_rd;
+} state;
+
 /* ------------------------------------------------------------
  * MCU Setup Functions
  * ------------------------------------------------------------ */
@@ -316,6 +326,9 @@ static void fusb_setup(void)
 {
     uint8_t reg;
 
+    state.mdac_vnc = FUSB302_MEAS_MDAC_MV(PD_SRC_DEF_MV);
+    state.mdac_rd = FUSB302_MEAS_MDAC_MV(PD_SRC_DEF_RD_MV);
+
     // Reset FUSB302
     fusb_reset();
 
@@ -354,8 +367,9 @@ static void fusb_setup(void)
     reg &= ~FUSB302_CTL0_INT_MASK;
     fusb_write(FUSB302_REG_CONTROL0, reg);
 
-    // Set VCONN switch defaults
-    // TODO implement struct to hold state for polarity, vconn, etc.
+    // Set VCONN and polarity defaults
+    state.vconn_enabled = 0;
+    state.cc_polarity = 0;
 
     // Power all
     fusb_power_all();
@@ -391,15 +405,6 @@ static void check_rx_buffer(void)
     uint8_t rx_buffer[80];
     fusb_read_fifo(rx_buffer, 80);
     hexdump(rx_buffer, 80);
-}
-
-static void fusb_get_status(void)
-{
-    uint8_t st0 = fusb_read(FUSB302_REG_STATUS0);
-    uint8_t st1 = fusb_read(FUSB302_REG_STATUS1);
-    usart_printf("FUSB STATUS0=0x%02X STATUS1=0x%02X\r\n", st0, st1);
-    check_rx_buffer();
-    usart_printf("INT pin=%02X\r\n", gpio_get(GPIOB, GPIO8) ? 1 : 0);
 }
 
 static int convert_bc_lvl(int bc_lvl, bool is_sink)
@@ -525,6 +530,14 @@ static void fusb_measure_cc_pin_snk(uint8_t *cc1, uint8_t *cc2)
     fusb_write(FUSB302_REG_SWITCHES0, reg);
 }
 
+static void fusb_get_cc(int *cc1, int *cc2)
+{
+    if (state.pulling_up) {
+        // source
+        fusb_measure_cc_pin_src()
+    }
+}
+
 static void fusb_enable_gcrc(bool enable)
 {
     // AUTO_GCRC is in SWITCHES1 register
@@ -536,6 +549,7 @@ static void fusb_enable_gcrc(bool enable)
     }
 }
 
+// function for debugging info
 static int fusb_check_cc_pin_src(void)
 {
     int ret = 0;
@@ -549,11 +563,49 @@ static int fusb_check_cc_pin_src(void)
     return ret;
 }
 
+static void fusb_detect_cc_pin_src(uint8_t *cc1, uint8_t *cc2)
+{
+    uint8_t cc1_meas = FUSB302_SW0_MEAS_CC1;
+    uint8_t cc2_meas = FUSB302_SW0_MEAS_CC2;
+
+    if (state.vconn_enabled) {
+        // measure pin matching polarity
+        if (state.cc_polarity) {
+            // cc2 pin
+            *cc2 = fusb_measure_cc_pin_src(cc2_meas);
+        } else {
+            // cc1 pin
+            *cc1 = fusb_measure_cc_pin_src(cc1_meas);
+        }
+    } else {
+        // measure both cc pins if vconn not enabled
+        *cc1 = fusb_measure_cc_pin_src(cc1_meas);
+        *cc2 = fusb_measure_cc_pin_src(cc2_meas);
+    }
+}
+
+// function for debugging info
 static void fusb_check_cc_pin_snk(void)
 {
     uint8_t cc1, cc2;
     fusb_measure_cc_pin_snk(&cc1, &cc2);
     usart_printf("Sink CC1: 0x%02X CC2: 0x%02X\r\n");
+}
+
+// function to print status info for debugging
+static void fusb_get_status(void)
+{
+    check_rx_buffer();
+    fusb_check_status_regs();
+    usart_printf("INT pin=%02X\r\n", gpio_get(GPIOB, GPIO8) ? 1 : 0);
+    if (state.pulling_up) {
+        // source
+        uint8_t cc_pin = fusb_check_cc_pin_src();
+        usart_printf("Source CC pin: %02X\r\n", cc_pin);
+    } else {
+        // sink
+        fusb_check_cc_pin_snk();
+    }
 }
 
 int main(void)
@@ -564,14 +616,10 @@ int main(void)
     i2c_setup();
     exti_setup(); 
 
-    fusb_setup_sniffer();
+    fusb_setup();
 
     while (1) {
-        fusb_check_cc_pin_snk();
-        uint8_t cc_pin = fusb_check_cc_pin_src();
-        usart_printf("Source CC pin: %02X\r\n", cc_pin);
         fusb_get_status();
-        fusb_check_status_regs();
         fusb_delay_ms(500);
     }
 }
