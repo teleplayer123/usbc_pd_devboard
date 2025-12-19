@@ -274,6 +274,19 @@ static void fusb_power_all(void)
     fusb_delay_ms(1);
 }
 
+// Print current state struct values for debugging
+static void fusb_current_state(void)
+{
+    usart_printf("---- Current FUSB302 State ----\r\n");
+    usart_printf("CC Polarity: %d\r\n", state.cc_polarity);
+    usart_printf("VCONN Enabled: %d\r\n", state.vconn_enabled);
+    usart_printf("Pulling Up (DFP): %d\r\n", state.pulling_up);
+    usart_printf("RX Enable: %d\r\n", state.rx_enable);
+    usart_printf("MDAC VNC: 0x%02X\r\n", state.mdac_vnc);
+    usart_printf("MDAC RD: 0x%02X\r\n", state.mdac_rd);
+    usart_printf("---- End State ----\r\n");
+}
+
 static void fusb_init_sink(void)
 {
     // Reset FUSB302
@@ -609,6 +622,7 @@ static void fusb_get_status(void)
         // sink
         fusb_check_cc_pin_snk();
     }
+    fusb_current_state();
 }
 
 int main(void)
