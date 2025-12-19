@@ -36,6 +36,8 @@ static void clock_setup(void)
     rcc_periph_clock_enable(RCC_GPIOB);
     rcc_periph_clock_enable(RCC_USART2);
     rcc_periph_clock_enable(RCC_I2C1);
+    // We need to enable the clock for SYSCFG to configure EXTI.
+    rcc_periph_clock_enable(RCC_SYSCFG_COMP);
 }
 
 static void usart_setup(void)
@@ -79,10 +81,6 @@ static void systick_setup(void)
 
 static void exti_setup(void)
 {
-    // FUSB302 INT_N is connected to PB8
-    // We need to enable the clock for SYSCFG to configure EXTI.
-    rcc_periph_clock_enable(RCC_SYSCFG_COMP);
-    
     // Map PB8 to EXTI8
     exti_select_source(EXTI8, GPIOB);
 
@@ -234,6 +232,14 @@ static void fusb_delay_ms(uint32_t ms)
     }
 }
 
+static void fusb_delay_us(uint32_t us) {
+    // At 48MHz, approximately 48 clock cycles per microsecond
+    // Each NOP takes 1 cycle, loop overhead is minimal
+    for (uint32_t i = 0; i < us * 6; i++) {
+        __asm__("nop");
+    }
+}
+
 static void fusb_reset(void)
 {
     fusb_write(FUSB302_REG_RESET, FUSB302_RESET_SW);
@@ -284,7 +290,7 @@ static void fusb_setup_sniffer(void)
     fusb_delay_ms(2);
 
      // Configure Switches0: Enable measurement (passive detection) on CC1 and CC2
-    fusb_write(FUSB302_REG_SWITCHES0, FUSB302_SW0_MEAS_CC1 | FUSB302_SW0_MEAS_CC2 | FUSB302_SW0_PU_EN1 | FUSB302_SW0_PU_EN2);
+    fusb_write(FUSB302_REG_SWITCHES0, FUSB302_SW0_MEAS_CC1 | FUSB302_SW0_MEAS_CC2);
 
     // Configure Control1: Enable reception of all SOP packets
     fusb_write(FUSB302_REG_CONTROL1, FUSB302_CTL1_ENSOP1 | FUSB302_CTL1_ENSOP2 | FUSB302_CTL1_ENSOP1DB | FUSB302_CTL1_ENSOP2DB);
@@ -368,7 +374,7 @@ static int fusb_measure_cc_pin_src(uint8_t cc_reg)
     // Set MDAC to default value
     uint8_t mdac = FUSB302_MEAS_MDAC_MV(PD_SRC_DEF_MV);
     fusb_write(FUSB302_REG_MEASURE, mdac);
-    fusb_delay_ms(2);
+    fusb_delay_us(250);
     // Read status register
     reg = fusb_read(FUSB302_REG_STATUS0);
     // Assume open
@@ -376,7 +382,7 @@ static int fusb_measure_cc_pin_src(uint8_t cc_reg)
     // CC voltage below no connect threshold
     if ((reg & FUSB302_STATUS0_COMP) == 0) {
         fusb_write(FUSB302_REG_MEASURE, PD_SRC_DEF_RD_MV);
-        fusb_delay_ms(2);
+        fusb_delay_us(250);
 
         // Read status register
         reg = fusb_read(FUSB302_REG_STATUS0);
@@ -410,7 +416,7 @@ static uint8_t fusb_measure_cc_pin_snk(void)
     reg |= FUSB302_SW0_MEAS_CC1;
     fusb_write(FUSB302_REG_SWITCHES0, reg);
     // Wait for measurement
-    fusb_delay_ms(2);
+    fusb_delay_us(250);
     // Read cc1 measurement
     bc_lvl_cc1 = fusb_read(FUSB302_REG_STATUS0);
     // Mask unwanted bits
@@ -424,7 +430,7 @@ static uint8_t fusb_measure_cc_pin_snk(void)
     reg |= FUSB302_SW0_MEAS_CC2;
     fusb_write(FUSB302_REG_SWITCHES0, reg);
     // Wait on measurement
-    fusb_delay_ms(2);
+    fusb_delay_us(250);
     // Read cc2 measurement
     bc_lvl_cc2 = fusb_read(FUSB302_REG_STATUS0);
     // Mask unwanted bits
