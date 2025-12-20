@@ -1016,7 +1016,7 @@ static void handle_command(char *line) {
             usart_printf("Unknown function: %s\r\n", p);
         }
     } else {
-        usart_printf("Commands:\r\n  Read from register:\t\tr <reg>\r\n  Write to register:\t\tw <reg> <val>\r\n  Probe I2C addresses:\t\tp (probe)\r\n  Bulk read:\t\t\tb <reg>\r\n  Bulk write to register:\tn <reg> <val1> <val2> ...\r\n  Read bits in register:\tt <reg> \r\n  Status:\t\ts \r\n  Call function:\t\tc <name> \r\n");
+        usart_printf("Commands:\r\n  Read from register:\t\tr <reg>\r\n  Write to register:\t\tw <reg> <val>\r\n  Probe I2C addresses:\t\tp (probe)\r\n  Bulk read:\t\t\tb <reg>\r\n  Bulk write to register:\tn <reg> <val1> <val2> ...\r\n  Read bits in register:\tt <reg> \r\n  Status:\t\t\ts \r\n  Call function:\t\tc <name> \r\n");
     }
 }
 
