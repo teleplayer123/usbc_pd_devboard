@@ -276,7 +276,11 @@ static void fusb_current_state(void)
     usart_printf("---- Current FUSB302 State ----\r\n");
     usart_printf("CC Polarity: %d\r\n", state.cc_polarity);
     usart_printf("VCONN Enabled: %d\r\n", state.vconn_enabled);
-    usart_printf("Pulling Up (DFP): %d\r\n", state.pulling_up);
+    if (state.pulling_up) {
+        usart_printf("Pulling Up (DFP): %d\r\n", state.pulling_up);
+    } else {
+        usart_printf("Pulling Down (UFP): %d\r\n", state.pulling_up);
+    }
     usart_printf("RX Enable: %d\r\n", state.rx_enable);
     usart_printf("MDAC VNC: 0x%02X\r\n", state.mdac_vnc);
     usart_printf("MDAC RD: 0x%02X\r\n", state.mdac_rd);
