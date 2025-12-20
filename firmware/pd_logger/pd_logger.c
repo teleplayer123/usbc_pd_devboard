@@ -196,7 +196,7 @@ static void hexdump(const uint8_t *data, size_t len)
     }
 }
 
-static inline bool uart_rx_ready(void)
+static inline bool usart_rx_ready(void)
 {
     return usart_get_flag(USART2, USART_FLAG_RXNE);
 }
@@ -685,7 +685,14 @@ int main(void)
     fusb_setup();
 
     while (1) {
+        if (usart_rx_ready()) {
+            char c = usart_recv(USART2);
+            if (c=='\r' || c=='\n') {
+                usart_printf("Logging paused. Press Enter to continue...\r\n");
+                usart_getc();
+            } 
+        }
         fusb_get_status();
-        fusb_delay_ms(500);
+        fusb_delay_ms(1000);
     }
 }
