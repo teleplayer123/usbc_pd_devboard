@@ -330,10 +330,10 @@ static uint8_t fusb_get_chip_id(uint32_t i2c) {
     return id;
 }
 
-static int convert_bc_lvl(int bc_lvl, bool is_sink)
+static int convert_bc_lvl(int bc_lvl, bool is_src)
 {
     int tc_lvl = TYPEC_CC_VOLT_OPEN;
-    if (is_sink) {
+    if (is_src) {
         if (bc_lvl == 0x00) {
             tc_lvl = TYPEC_CC_VOLT_RA;
         } else if (bc_lvl < 0x03) {
@@ -435,8 +435,8 @@ static void fusb_measure_cc_pin_snk(int *cc1, int *cc2)
     bc_lvl_cc2 &= (FUSB302_STATUS0_BC_LVL0 | FUSB302_STATUS0_BC_LVL1);
     usart_printf("CC2 Sink BC_LVL: %02X\r\n", bc_lvl_cc2);
 
-    *cc1 = convert_bc_lvl(bc_lvl_cc1, true);
-    *cc2 = convert_bc_lvl(bc_lvl_cc2, true);
+    *cc1 = convert_bc_lvl(bc_lvl_cc1, false);
+    *cc2 = convert_bc_lvl(bc_lvl_cc2, false);
 
     // Reset MEAS switches to original state
     reg = fusb_read(FUSB302_REG_SWITCHES0);
