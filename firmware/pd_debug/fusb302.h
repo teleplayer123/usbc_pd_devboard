@@ -2,6 +2,9 @@
 #ifndef FUSB302_H
 #define FUSB302_H
 
+#include <stdint.h>
+#include <stdlib.h>
+
 /* -----------------------------------------------------------
  * I2C Address
  * ----------------------------------------------------------- */
@@ -277,12 +280,23 @@
 #define BIT(x) (1 << (x))
 #define PD_SRC_DEF_MV               1600
 #define PD_SRC_DEF_RD_MV            200
-#define	TYPEC_CC_VOLT_OPEN          0
-#define TYPEC_CC_VOLT_SNK_DEF       5
-#define TYPEC_CC_VOLT_SNK_MED       6
-#define TYPEC_CC_VOLT_SNK_HIGH      7
-#define	TYPEC_CC_VOLT_RA            1
-#define	TYPEC_CC_VOLT_RD            2
+#define PD_RETRY_COUNT              3
+
+enum tcpc_cc_voltage_status {
+	TYPEC_CC_VOLT_OPEN = 0,
+	TYPEC_CC_VOLT_RA = 1,
+	TYPEC_CC_VOLT_RD = 2,
+	TYPEC_CC_VOLT_SNK_DEF = 5,
+	TYPEC_CC_VOLT_SNK_1_5 = 6,
+	TYPEC_CC_VOLT_SNK_3_0 = 7,
+};
+
+enum tcpc_cc_pull {
+	TYPEC_CC_RA = 0,
+	TYPEC_CC_RP = 1,
+	TYPEC_CC_RD = 2,
+	TYPEC_CC_OPEN = 3,
+};
 
 typedef struct {
     uint16_t header;
@@ -303,6 +317,14 @@ enum fusb302_txfifo_tokens {
     FUSB302_TX_TKN_JAMCRC = 0xFF,
     FUSB302_TX_TKN_EOP = 0x14,
     FUSB302_TX_TKN_TXOFF = 0xFE,
+};
+
+enum fusb302_rxfifo_tokens {
+    FUSB302_RX_TKN_SOP = 0xE0,
+    FUSB302_RX_TKN_SOP1 = 0xC0,
+    FUSB302_RX_TKN_SOP2 = 0xA0,
+    FUSB302_RX_TKN_PACKSYM = 0x80,
+    FUSB302_RX_TKN_EOP = 0xD0,
 };
 
 /* -----------------------------------------------------------

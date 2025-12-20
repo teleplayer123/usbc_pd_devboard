@@ -17,6 +17,16 @@
 // Status flag for exti handler
 volatile bool fusb_event_pending = false;
 
+static struct fusb302_chip_state {
+	int cc_polarity;
+	int vconn_enabled;
+	/* 1 = pulling up (DFP) 0 = pulling down (UFP) */
+	int pulling_up;
+	int rx_enable;
+	uint8_t mdac_vnc;
+	uint8_t mdac_rd;
+} state;
+
 /*---- MCU setup functions ----*/
 
 static void clock_setup(void) {
@@ -245,7 +255,33 @@ static void i2c_write_reg(uint8_t reg, uint8_t val) {
     i2c_transfer7(I2C1, FUSB302_ADDR, tx_buf, 2, NULL, 0);
 }
 
+static void fusb_write(uint8_t reg, uint8_t val)
+{
+    uint8_t tx_buf[2] = {reg, val};
+    i2c_transfer7(I2C1, FUSB302_ADDR, tx_buf, 2, NULL, 0);
+}
+
+static inline uint8_t fusb_read(uint8_t reg)
+{
+    uint8_t v;
+    i2c_transfer7(I2C1, FUSB302_ADDR, &reg, 1, &v, 1);
+    return v;
+}
+
 /*---- FUSB302 functions ----*/
+
+// Print current state struct values for debugging
+static void fusb_current_state(void)
+{
+    usart_printf("---- Current FUSB302 State ----\r\n");
+    usart_printf("CC Polarity: %d\r\n", state.cc_polarity);
+    usart_printf("VCONN Enabled: %d\r\n", state.vconn_enabled);
+    usart_printf("Pulling Up (DFP): %d\r\n", state.pulling_up);
+    usart_printf("RX Enable: %d\r\n", state.rx_enable);
+    usart_printf("MDAC VNC: 0x%02X\r\n", state.mdac_vnc);
+    usart_printf("MDAC RD: 0x%02X\r\n", state.mdac_rd);
+    usart_printf("---- End State ----\r\n");
+}
 
 static void fusb_delay_ms(uint32_t ms) {
     // This assumes SysTick is running at 1ms intervals.
@@ -290,33 +326,32 @@ static uint8_t fusb_get_chip_id(uint32_t i2c) {
     return id;
 }
 
-static int bc_lvl_to_cc_voltage_snk(uint8_t bc_lvl) {
-    // Convert BC_LVL (2-bit value from STATUS0 register) to Type-C CC Voltage Status
-    // BC_LVL is extracted from bits FUSB302_STATUS0_BC_LVL1 and FUSB302_STATUS0_BC_LVL0
-    // Mapping:
-    //   00b = Open (no connection)
-    //   01b = Default Current (~0.5A, Vcc = 0.2V)
-    //   10b = Medium Current (~1.5A, Vcc = 0.66V)
-    //   11b = High Current (~3.0A, Vcc = 1.1V)
-    
-    switch (bc_lvl) {
-        case 0:  // 00b - Open
-            return TYPEC_CC_VOLT_OPEN;
-        case 1:  // 01b - Default Current
-            return TYPEC_CC_VOLT_SNK_DEF;
-        case 2:  // 10b - Medium Current
-            return TYPEC_CC_VOLT_SNK_MED;
-        case 3:  // 11b - High Current
-            return TYPEC_CC_VOLT_SNK_HIGH;
-        default:
-            return TYPEC_CC_VOLT_OPEN;
+static int convert_bc_lvl(int bc_lvl, bool is_sink)
+{
+    int tc_lvl = TYPEC_CC_VOLT_OPEN;
+    if (is_sink) {
+        if (bc_lvl == 0x00) {
+            tc_lvl = TYPEC_CC_VOLT_RA;
+        } else if (bc_lvl < 0x03) {
+            tc_lvl = TYPEC_CC_VOLT_RD;
+        }
+    } else {
+        if (bc_lvl == 0x01) {
+            tc_lvl = TYPEC_CC_VOLT_SNK_DEF;
+        } else if (bc_lvl == 0x02) {
+            tc_lvl = TYPEC_CC_VOLT_SNK_1_5;
+        } else if (bc_lvl == 0x03) {
+            tc_lvl = TYPEC_CC_VOLT_SNK_3_0;
+        }
     }
+    return tc_lvl;
 }
 
-static int fusb_measure_cc_pin_src(uint32_t i2c, uint8_t cc_reg) {
+static int fusb_measure_cc_pin_src(uint8_t cc_reg)
+{
     // Read status from switches0 register
     uint8_t reg, sw0_orig, cc_lvl;
-    fusb_read_reg(i2c, FUSB302_REG_SWITCHES0, &reg);
+    reg = fusb_read(FUSB302_REG_SWITCHES0);
     sw0_orig = reg;
     // Clear measurement bits
     reg &= ~(FUSB302_SW0_MEAS_CC1 | FUSB302_SW0_MEAS_CC2);
@@ -329,35 +364,36 @@ static int fusb_measure_cc_pin_src(uint32_t i2c, uint8_t cc_reg) {
     // Set CC measure bit
     reg |= cc_reg;
     // Set measurement switch
-    fusb_write_reg(i2c, FUSB302_REG_SWITCHES0, reg);
+    fusb_write(FUSB302_REG_SWITCHES0, reg);
     // Set MDAC to default value
     uint8_t mdac = FUSB302_MEAS_MDAC_MV(PD_SRC_DEF_MV);
-    fusb_write_reg(i2c, FUSB302_REG_MEASURE, mdac);
-    fusb_delay_ms(250);
+    fusb_write(FUSB302_REG_MEASURE, mdac);
+    fusb_delay_us(250);
     // Read status register
-    fusb_read_reg(i2c, FUSB302_REG_STATUS0, &reg);
+    reg = fusb_read(FUSB302_REG_STATUS0);
     // Assume open
     cc_lvl = 0;
     // CC voltage below no connect threshold
     if ((reg & FUSB302_STATUS0_COMP) == 0) {
-        fusb_write_reg(i2c, FUSB302_REG_MEASURE, PD_SRC_DEF_RD_MV);
-        fusb_delay_ms(250);
+        fusb_write(FUSB302_REG_MEASURE, PD_SRC_DEF_RD_MV);
+        fusb_delay_us(250);
 
         // Read status register
-        fusb_read_reg(i2c, FUSB302_REG_STATUS0, &reg);
+        reg = fusb_read(FUSB302_REG_STATUS0);
 
         cc_lvl = (reg & FUSB302_STATUS0_COMP) ? TYPEC_CC_VOLT_RD : TYPEC_CC_VOLT_RA;
     }
     // Restore original switches0 register
-    fusb_write_reg(i2c, FUSB302_REG_SWITCHES0, sw0_orig);
+    fusb_write(FUSB302_REG_SWITCHES0, sw0_orig);
     return cc_lvl;
 }
 
-static void fusb_measure_cc_pin_snk(uint32_t i2c, uint8_t *cc1, uint8_t *cc2) {
+static void fusb_measure_cc_pin_snk(int *cc1, int *cc2)
+{
     uint8_t reg, orig_cc1, orig_cc2, bc_lvl_cc1, bc_lvl_cc2;
 
     // Measure cc1
-    fusb_read_reg(i2c, FUSB302_REG_SWITCHES0, &reg);
+    reg = fusb_read(FUSB302_REG_SWITCHES0);
     if (reg & FUSB302_SW0_MEAS_CC1) {
         orig_cc1 = 1;
     } else {
@@ -372,35 +408,34 @@ static void fusb_measure_cc_pin_snk(uint32_t i2c, uint8_t *cc1, uint8_t *cc2) {
     // Disable cc2 measurement switch, enable cc1 measurement switch
     reg &= ~FUSB302_SW0_MEAS_CC2;
     reg |= FUSB302_SW0_MEAS_CC1;
-    fusb_write_reg(i2c, FUSB302_REG_SWITCHES0, reg);
+    fusb_write(FUSB302_REG_SWITCHES0, reg);
     // Wait for measurement
     fusb_delay_us(250);
     // Read cc1 measurement
-    fusb_read_reg(i2c, FUSB302_REG_STATUS0, &bc_lvl_cc1);
+    bc_lvl_cc1 = fusb_read(FUSB302_REG_STATUS0);
     // Mask unwanted bits
     bc_lvl_cc1 &= (FUSB302_STATUS0_BC_LVL0 | FUSB302_STATUS0_BC_LVL1);
     usart_printf("CC1 Sink BC_LVL: %02X\r\n", bc_lvl_cc1);
 
     // Measure cc2
-    fusb_read_reg(i2c, FUSB302_REG_SWITCHES0, &reg);
+    reg = fusb_read(FUSB302_REG_SWITCHES0);
     // Disable cc1 measurement switch and enable cc2 measurement switch
     reg &= ~FUSB302_SW0_MEAS_CC1;
     reg |= FUSB302_SW0_MEAS_CC2;
-    fusb_write_reg(i2c, FUSB302_REG_SWITCHES0, reg);
+    fusb_write(FUSB302_REG_SWITCHES0, reg);
     // Wait on measurement
     fusb_delay_us(250);
     // Read cc2 measurement
-    fusb_read_reg(i2c, FUSB302_REG_STATUS0, &bc_lvl_cc2);
+    bc_lvl_cc2 = fusb_read(FUSB302_REG_STATUS0);
     // Mask unwanted bits
     bc_lvl_cc2 &= (FUSB302_STATUS0_BC_LVL0 | FUSB302_STATUS0_BC_LVL1);
     usart_printf("CC2 Sink BC_LVL: %02X\r\n", bc_lvl_cc2);
 
-    // Convert bc_lvl to typec cc voltage
-    *cc1 = bc_lvl_to_cc_voltage_snk(bc_lvl_cc1);
-    *cc2 = bc_lvl_to_cc_voltage_snk(bc_lvl_cc2);
+    *cc1 = convert_bc_lvl(bc_lvl_cc1, true);
+    *cc2 = convert_bc_lvl(bc_lvl_cc2, true);
 
     // Reset MEAS switches to original state
-    fusb_read_reg(i2c, FUSB302_REG_SWITCHES0, &reg);
+    reg = fusb_read(FUSB302_REG_SWITCHES0);
     if (orig_cc1) {
         reg |= FUSB302_SW0_MEAS_CC1;
     } else {
@@ -411,7 +446,7 @@ static void fusb_measure_cc_pin_snk(uint32_t i2c, uint8_t *cc1, uint8_t *cc2) {
     } else {
         reg &= ~FUSB302_SW0_MEAS_CC2;
     }
-    fusb_write_reg(i2c, FUSB302_REG_SWITCHES0, reg);
+    fusb_write(FUSB302_REG_SWITCHES0, reg);
 }
 
 static void fusb_enable_gcrc(uint32_t i2c, bool enable) {
@@ -423,19 +458,6 @@ static void fusb_enable_gcrc(uint32_t i2c, bool enable) {
     } else {
         reg &= ~FUSB302_SW1_AUTO_GCRC;
     }
-}
-
-static int fusb_check_cc_lines_src(int32_t i2c) {
-    int ret = 0;
-    fusb_power_all(i2c);
-    int cc1_lvl = fusb_measure_cc_pin_src(i2c, FUSB302_SW0_MEAS_CC1);
-    int cc2_lvl = fusb_measure_cc_pin_src(i2c, FUSB302_SW0_MEAS_CC2);
-    if (cc1_lvl != TYPEC_CC_VOLT_OPEN && cc2_lvl == TYPEC_CC_VOLT_OPEN) {
-        ret = 1; // Device detected on CC1
-    } else if (cc2_lvl != TYPEC_CC_VOLT_OPEN && cc1_lvl == TYPEC_CC_VOLT_OPEN) {
-        ret = 2; // Device detected on CC2
-    }
-    return ret;
 }
 
 static void fusb_flush_rx(uint32_t i2c) {
@@ -466,42 +488,306 @@ static void fusb_init_sink(uint32_t i2c) {
     usart_printf("FUSB302 initialized in Sink mode.\n");
 }
 
-static void fusb_setup_sniffer(int32_t i2c) {    
+// static void fusb_setup_sniffer(int32_t i2c) {    
+//     usart_printf("Initializing FUSB302 for PD Sniffing...\n");
+    
+//     // Reset the FUSB302
+//     fusb_write_reg(i2c, FUSB302_REG_RESET, FUSB302_RESET_SW | FUSB302_RESET_PD);
+//     fusb_delay_ms(2);
+
+//     // Power on
+//     fusb_write_reg(i2c, FUSB302_REG_POWER, FUSB302_POWER_ALL_ON);
+//     fusb_delay_ms(2);
+
+//      // Configure Switches0: Enable measurement (passive detection) on CC1 and CC2
+//     fusb_write_reg(i2c, FUSB302_REG_SWITCHES0, FUSB302_SW0_MEAS_CC1 | FUSB302_SW0_MEAS_CC2 | FUSB302_SW0_PDWN1 | FUSB302_SW0_PDWN2);
+
+//     // Configure Control1: Enable reception of all SOP packets
+//     fusb_write_reg(i2c, FUSB302_REG_CONTROL1, FUSB302_CTL1_ENSOP1 | FUSB302_CTL1_ENSOP2 | FUSB302_CTL1_ENSOP1DB | FUSB302_CTL1_ENSOP2DB);
+
+//     // Accept SOP packets
+//     fusb_write_reg(i2c, FUSB302_REG_CONTROL2, FUSB302_CTL2_WAKE_EN | FUSB302_CTL2_TOGGLE);
+
+//     // Unmask all interrupts
+//     fusb_write_reg(i2c, FUSB302_REG_MASK, 0x00);
+//     fusb_write_reg(i2c, FUSB302_REG_MASKA, 0x00);
+//     fusb_write_reg(i2c, FUSB302_REG_MASKB, 0x00);
+
+//     // Clear interrupts
+//     i2c_read_reg(FUSB302_REG_INTERRUPT);
+//     i2c_read_reg(FUSB302_REG_INTERRUPTA);
+//     i2c_read_reg(FUSB302_REG_INTERRUPTB);
+//     fusb_delay_ms(2);
+
+//     usart_printf("FUSB302 configured for PD Sniffing.\n");
+// }
+
+static void fusb_setup_sniffer(void)
+{    
+    uint8_t reg;
+
     usart_printf("Initializing FUSB302 for PD Sniffing...\n");
+
+    state.mdac_vnc = FUSB302_MEAS_MDAC_MV(PD_SRC_DEF_MV);
+    state.mdac_rd = FUSB302_MEAS_MDAC_MV(PD_SRC_DEF_RD_MV);
     
     // Reset the FUSB302
-    fusb_write_reg(i2c, FUSB302_REG_RESET, FUSB302_RESET_SW | FUSB302_RESET_PD);
+    fusb_write(FUSB302_REG_RESET, FUSB302_RESET_SW);
     fusb_delay_ms(2);
 
     // Power on
-    fusb_write_reg(i2c, FUSB302_REG_POWER, FUSB302_POWER_ALL_ON);
-    fusb_delay_ms(2);
+    fusb_write(FUSB302_REG_POWER, FUSB302_POWER_ALL_ON);
+    fusb_delay_ms(1);
 
-     // Configure Switches0: Enable measurement (passive detection) on CC1 and CC2
-    fusb_write_reg(i2c, FUSB302_REG_SWITCHES0, FUSB302_SW0_MEAS_CC1 | FUSB302_SW0_MEAS_CC2 | FUSB302_SW0_PDWN1 | FUSB302_SW0_PDWN2);
+    // Configure Switches0: Enable measurement (passive detection) on CC1 and CC2
+    reg = fusb_read(FUSB302_REG_SWITCHES0);
+    reg |= (FUSB302_SW0_MEAS_CC1 | FUSB302_SW0_MEAS_CC2 | FUSB302_SW0_PDWN1 | FUSB302_SW0_PDWN2);
+    fusb_write(FUSB302_REG_SWITCHES0, reg);
 
     // Configure Control1: Enable reception of all SOP packets
-    fusb_write_reg(i2c, FUSB302_REG_CONTROL1, FUSB302_CTL1_ENSOP1 | FUSB302_CTL1_ENSOP2 | FUSB302_CTL1_ENSOP1DB | FUSB302_CTL1_ENSOP2DB);
+    fusb_write(FUSB302_REG_CONTROL1, FUSB302_CTL1_ENSOP1 | FUSB302_CTL1_ENSOP2 | FUSB302_CTL1_ENSOP1DB | FUSB302_CTL1_ENSOP2DB);
 
-    // Accept SOP packets
-    fusb_write_reg(i2c, FUSB302_REG_CONTROL2, FUSB302_CTL2_WAKE_EN | FUSB302_CTL2_TOGGLE);
+    // Enable Auto-CRC, Set sink role
+    fusb_write(FUSB302_REG_SWITCHES1, FUSB302_SW1_AUTO_GCRC | FUSB302_SW1_SPECREV1 | FUSB302_SW1_SPECREV0);
+
+    // Toggle to detect CC and establish UFP (Sink)
+    fusb_write(FUSB302_REG_CONTROL2, FUSB302_CTL2_MODE_UFP | FUSB302_CTL2_WAKE_EN | FUSB302_CTL2_TOGGLE);
 
     // Unmask all interrupts
-    fusb_write_reg(i2c, FUSB302_REG_MASK, 0x00);
-    fusb_write_reg(i2c, FUSB302_REG_MASKA, 0x00);
-    fusb_write_reg(i2c, FUSB302_REG_MASKB, 0x00);
+    fusb_write(FUSB302_REG_MASK, 0x00);
+    fusb_write(FUSB302_REG_MASKA, 0x00);
+    fusb_write(FUSB302_REG_MASKB, 0x00);
 
     // Clear interrupts
-    i2c_read_reg(FUSB302_REG_INTERRUPT);
-    i2c_read_reg(FUSB302_REG_INTERRUPTA);
-    i2c_read_reg(FUSB302_REG_INTERRUPTB);
+    fusb_read(FUSB302_REG_INTERRUPT);
+    fusb_read(FUSB302_REG_INTERRUPTA);
+    fusb_read(FUSB302_REG_INTERRUPTB);
     fusb_delay_ms(2);
+
+    // Set VCONN and polarity defaults
+    state.vconn_enabled = 0;
+    state.cc_polarity = 0;
+    // Pull-down enabled
+    state.pulling_up = 0;
+    // RX enabled
+    state.rx_enable = 1;
 
     usart_printf("FUSB302 configured for PD Sniffing.\n");
 }
 
+static void fusb_setup(void)
+{
+    uint8_t reg;
+
+    state.mdac_vnc = FUSB302_MEAS_MDAC_MV(PD_SRC_DEF_MV);
+    state.mdac_rd = FUSB302_MEAS_MDAC_MV(PD_SRC_DEF_RD_MV);
+
+    // Reset the FUSB302
+    fusb_write(FUSB302_REG_RESET, FUSB302_RESET_SW);
+    fusb_delay_ms(2);
+
+    // Power on
+    fusb_write(FUSB302_REG_POWER, FUSB302_POWER_ALL_ON);
+    fusb_delay_ms(1);
+
+    // Turn on retries and set number of retries
+    reg = fusb_read(FUSB302_REG_CONTROL3);
+    reg |= (FUSB302_CTL3_AUTO_RETRY | FUSB302_CTL3_NRETRIES_MASK);
+    fusb_write(FUSB302_REG_CONTROL3, reg);
+
+    // Create interrupt masks
+    reg = 0xFF;
+    // CC level changes
+    reg &= ~FUSB302_MASK_BC_LVL;
+    // Collisions
+    reg &= ~FUSB302_MASK_COLLISION;
+    // Alert
+    reg &= ~FUSB302_MASK_ALERT;
+    // Packet received with correct crc
+    reg &= ~FUSB302_MASK_CRC_CHK;
+    fusb_write(FUSB302_REG_MASK, reg);
+
+    // MaskA reg masks
+    reg = 0xFF;
+    reg &= ~FUSB302_MASKA_RETRYFAIL;
+    reg &= ~FUSB302_MASKA_HARDSENT;
+    reg &= ~FUSB302_MASKA_TXSENT;
+    reg &= ~FUSB302_MASKA_HARDRST;
+    fusb_write(FUSB302_REG_MASKA, reg);
+    
+    // Mask GoodCRC to ack pd message
+    reg = 0xFF;
+    reg &= ~FUSB302_MASKB_GCRCSENT;
+    fusb_write(FUSB302_REG_MASKB, reg);
+
+    // Enable interrupt
+    reg = fusb_read(FUSB302_REG_CONTROL0);
+    reg &= ~FUSB302_CTL0_INT_MASK;
+    fusb_write(FUSB302_REG_CONTROL0, reg);
+
+    // Set VCONN and polarity defaults
+    state.vconn_enabled = 0;
+    state.cc_polarity = 0;
+}
+
 static bool fusb_rx_empty(void) {
     return (i2c_read_reg(FUSB302_REG_STATUS1) & FUSB302_STATUS1_RX_EMPTY);
+}
+
+static void fusb_check_status_regs(void)
+{
+    uint8_t reg;
+    // Read and print status0 bits
+    usart_printf("---- STATUS0 ----\r\n");
+    reg = fusb_read(FUSB302_REG_STATUS0);
+    dump_bits(reg, fusb302_status0_bits);
+    usart_printf("\r\n");
+    // Read and print status1 bits
+    usart_printf("---- STATUS1 ----\r\n");
+    reg = fusb_read(FUSB302_REG_STATUS1);
+    dump_bits(reg, fusb302_status1_bits);
+    usart_printf("\r\n");
+    // Read and print status0a bits
+    usart_printf("---- STATUS0A ----\r\n");
+    reg = fusb_read(FUSB302_REG_STATUS0A);
+    dump_bits(reg, fusb302_status0a_bits);
+    usart_printf("\r\n");
+    // Read and print status1a bits
+    usart_printf("---- STATUS1A ----\r\n");
+    reg = fusb_read(FUSB302_REG_STATUS1A);
+    dump_bits(reg, fusb302_status1a_bits);
+    usart_printf("\r\n");
+}
+
+static void check_rx_buffer(void)
+{
+    uint8_t rx_buffer[80];
+    fusb_read_fifo(rx_buffer, 80);
+    hexdump(rx_buffer, 80);
+}
+
+// function for debugging info
+static int fusb_check_cc_pin_src(void)
+{
+    int ret = 0;
+    int cc1_lvl = fusb_measure_cc_pin_src(FUSB302_SW0_MEAS_CC1);
+    int cc2_lvl = fusb_measure_cc_pin_src(FUSB302_SW0_MEAS_CC2);
+    if (cc1_lvl != TYPEC_CC_VOLT_OPEN && cc2_lvl == TYPEC_CC_VOLT_OPEN) {
+        ret = 1; // Device detected on CC1
+    } else if (cc2_lvl != TYPEC_CC_VOLT_OPEN && cc1_lvl == TYPEC_CC_VOLT_OPEN) {
+        ret = 2; // Device detected on CC2
+    }
+    return ret;
+}
+
+static void fusb_detect_cc_pin_src(int *cc1, int *cc2)
+{
+    uint8_t cc1_meas = FUSB302_SW0_MEAS_CC1;
+    uint8_t cc2_meas = FUSB302_SW0_MEAS_CC2;
+
+    if (state.vconn_enabled) {
+        // measure pin matching polarity
+        if (state.cc_polarity) {
+            // cc2 pin
+            *cc2 = fusb_measure_cc_pin_src(cc2_meas);
+        } else {
+            // cc1 pin
+            *cc1 = fusb_measure_cc_pin_src(cc1_meas);
+        }
+    } else {
+        // measure both cc pins if vconn not enabled
+        *cc1 = fusb_measure_cc_pin_src(cc1_meas);
+        *cc2 = fusb_measure_cc_pin_src(cc2_meas);
+    }
+}
+
+static void fusb_get_cc(int *cc1, int *cc2)
+{
+    if (state.pulling_up) {
+        // source
+        fusb_detect_cc_pin_src(cc1, cc2);
+    } else {
+        // sink
+        fusb_measure_cc_pin_snk(cc1, cc2);
+    }
+}
+
+// function for debugging info
+static void fusb_check_cc_pin_snk(void)
+{
+    int cc1, cc2;
+    fusb_measure_cc_pin_snk(&cc1, &cc2);
+    usart_printf("Sink CC1: 0x%02X CC2: 0x%02X\r\n");
+}
+
+static int fusb_set_cc(int pull)
+{
+    uint8_t reg;
+
+    switch (pull) {
+        case TYPEC_CC_RP:
+            usart_printf("Setting CC to type RP...\r\n");
+            reg = fusb_read(FUSB302_REG_SWITCHES0);
+            // enable needed pull-up
+            reg &= ~(FUSB302_SW0_PU_EN1 | FUSB302_SW0_PU_EN2 | FUSB302_SW0_PDWN1 | FUSB302_SW0_PDWN2 | FUSB302_SW0_VCONN_CC1 | FUSB302_SW0_VCONN_CC2);
+            reg |= (FUSB302_SW0_PU_EN1 | FUSB302_SW0_PU_EN2);
+
+            if (state.vconn_enabled) {
+                reg |= state.cc_polarity ? FUSB302_SW0_VCONN_CC1 : FUSB302_SW0_VCONN_CC2;
+            }
+            fusb_write(FUSB302_REG_SWITCHES0, reg);
+            state.pulling_up = 1;
+            break;
+        case TYPEC_CC_RD:
+            usart_printf("Setting CC to type RD...\r\n");
+            // enable UFP mode
+            // turn off toggle
+            reg = fusb_read(FUSB302_REG_CONTROL2);
+            reg &= ~(FUSB302_CTL2_TOGGLE);
+            fusb_write(FUSB302_REG_CONTROL2, reg);
+            
+            // enable pull-downs and disable pull-ups
+            reg = fusb_read(FUSB302_REG_SWITCHES0);
+            reg &= ~(FUSB302_SW0_PU_EN1 | FUSB302_SW0_PU_EN2);
+            reg |= (FUSB302_SW0_PDWN1 | FUSB302_SW0_PDWN2);
+            fusb_write(FUSB302_REG_SWITCHES0, reg);
+            state.pulling_up = 0;
+            break;
+        case TYPEC_CC_OPEN:
+            usart_printf("Setting CC to type Open...\r\n");
+            // disable toggle
+            reg = fusb_read(FUSB302_REG_CONTROL2);
+            reg &= ~(FUSB302_CTL2_TOGGLE);
+            fusb_write(FUSB302_REG_CONTROL2, reg);
+            // manual switches must be open
+            reg = fusb_read(FUSB302_REG_SWITCHES0);
+            reg &= ~(FUSB302_SW0_PU_EN1 | FUSB302_SW0_PU_EN2 | FUSB302_SW0_PDWN1 | FUSB302_SW0_PDWN2);
+            fusb_write(FUSB302_REG_SWITCHES0, reg);
+            state.pulling_up = 0;
+            break;
+        default:
+            usart_printf("Unsupported CC type!\r\n");
+            // unsupported
+            return -1;
+    }
+    return 0;
+}
+
+// function to print status info for debugging
+static void fusb_get_status(void)
+{
+    check_rx_buffer();
+    fusb_check_status_regs();
+    usart_printf("INT pin=%02X\r\n", gpio_get(GPIOB, GPIO8) ? 1 : 0);
+    if (state.pulling_up) {
+        // source
+        uint8_t cc_pin = fusb_check_cc_pin_src();
+        usart_printf("Source CC pin: %02X\r\n", cc_pin);
+    } else {
+        // sink
+        fusb_check_cc_pin_snk();
+    }
+    fusb_current_state();
 }
 
 /* ---- PD Functions ----*/
@@ -573,15 +859,19 @@ static void handle_pd_message(pd_msg_t *p){
 
 /* ---- Interrupt Handling and Decoding Logic ---- */
 
-void exti4_15_isr(void) {
-    exti_reset_request(EXTI8);  // clear interrupt flag
-    fusb_event_pending = true;  // signal main loop to handle PD
-}
+void exti4_15_isr(void)
+{
+    usart_printf("EXTI handler triggered!\r\n");
+    while (1) {
+        if (exti_get_flag_status(EXTI8)) {
+            /* USB-PD handling */
+            pd_msg_t msg;
+            if (read_pd_message(&msg))
+                handle_pd_message(&msg);
 
-static void check_rx_buffer(void) {
-    uint8_t rx_buffer[80];
-    fusb_read_fifo(rx_buffer, 80);
-    hexdump(rx_buffer, 80);
+            exti_reset_request(EXTI8);
+        }
+    }
 }
 
 /* ---- CLI parser ---- */
@@ -635,21 +925,18 @@ static void handle_command(char *line) {
         uint8_t val;
         fusb_read_reg(I2C1, reg, &val);
         print_byte_as_bits(val, reg);
-    } else if (line[0] == 'm') {
-        fusb_init_sink(I2C1);
-        for (int i=0; i<=50; i++) {
-            check_rx_buffer();
-        }
+    } else if (line[0] == 's') {
+        fusb_get_status();
     } else if (line[0] == 'c') {
         // Call a function by name
         char *p = strtok(&line[1], " ");
         if (!p) { usart_printf("usage: c <function_name>\r\n"); return; }
         if (strcmp(p, "fusb_measure_cc_pin_src") == 0) {
-            int cc1_lvl = fusb_measure_cc_pin_src(I2C1, FUSB302_SW0_MEAS_CC1);
-            int cc2_lvl = fusb_measure_cc_pin_src(I2C1, FUSB302_SW0_MEAS_CC2);
+            int cc1_lvl = fusb_measure_cc_pin_src(FUSB302_SW0_MEAS_CC1);
+            int cc2_lvl = fusb_measure_cc_pin_src(FUSB302_SW0_MEAS_CC2);
             usart_printf("CC1 level: %d, CC2 level: %d\r\n", cc1_lvl, cc2_lvl);
         } else if (strcmp(p, "fusb_check_cc_lines_src") == 0) {
-            int ret = fusb_check_cc_lines_src(I2C1);
+            int ret = fusb_check_cc_pin_src();
             if (ret == 1) {
                 usart_printf("Device detected on CC1.\r\n");
             } else if (ret == 2) {
@@ -658,10 +945,10 @@ static void handle_command(char *line) {
                 usart_printf("No device detected on CC lines.\r\n");
             }
         } else if (strcmp(p, "fusb_measure_cc_pin_snk") == 0) {
-            uint8_t cc1, cc2;
-            fusb_measure_cc_pin_snk(I2C1, &cc1, &cc2);
+            int cc1, cc2;
+            fusb_measure_cc_pin_snk(&cc1, &cc2);
             usart_printf("---- CC Sink Measurements ----\r\n");
-            usart_printf("CC1: 0x%02X, CC2: 0x%02X\r\n");
+            usart_printf("CC1: 0x%02X, CC2: 0x%02X\r\n", cc1, cc2);
         } else if (strcmp(p, "fusb_get_chip_id") == 0) {
             uint8_t id = fusb_get_chip_id(I2C1);
             usart_printf("FUSB302 Chip ID (Reg: 0x01): 0x%02X\r\n", id);
@@ -675,7 +962,7 @@ static void handle_command(char *line) {
             fusb_pd_reset(I2C1);
             usart_printf("FUSB302 PD Reset (Reg: 0x0C) performed\r\n");
         } else if (strcmp(p, "fusb_setup_sniffer") == 0) {
-            fusb_setup_sniffer(I2C1);
+            fusb_setup_sniffer();
             usart_printf("FUSB302 Sniffer mode setup done\r\n");
         } else if (strcmp(p, "fusb_enable_gcrc") == 0) {
             p = strtok(NULL, " ");
@@ -701,11 +988,31 @@ static void handle_command(char *line) {
             check_rx_buffer();
         } else if (strcmp(p, "fusb_init_sink") == 0) {
             fusb_init_sink(I2C1);
+        } else if (strcmp(p, "fusb_current_state") == 0) {
+            fusb_current_state();
+        } else if (strcmp(p, "fusb_setup") == 0) {
+            fusb_setup();
+        } else if (strcmp(p, "fusb_get_status") == 0) {
+            fusb_get_status();
+        } else if (strcmp(p, "fusb_check_cc_pin_snk") == 0) {
+            fusb_check_cc_pin_snk();
+        } else if (strcmp(p, "fusb_get_cc") == 0) {
+            int cc1, cc2;
+            fusb_get_cc(&cc1, &cc2);
+            usart_printf("CC1: 0x%02X, CC2: 0x%02X\r\n", cc1, cc2);
+        } else if (strcmp(p, "fusb_set_cc") == 0) {
+            int pull = state.pulling_up;
+            int ret = fusb_set_cc(pull);
+            if (ret == 0) {
+                usart_printf("Successfully set CC type.\r\n");
+            } else {
+                usart_printf("Failed to set CC type!\r\n");
+            }
         } else {
             usart_printf("Unknown function: %s\r\n", p);
         }
     } else {
-        usart_printf("Commands:\r\n  Read from register:\t\tr <reg>\r\n  Write to register:\t\tw <reg> <val>\r\n  Probe I2C addresses:\t\tp (probe)\r\n  Bulk read:\t\t\tb <reg>\r\n  Bulk write to register:\tn <reg> <val1> <val2> ...\r\n  Read bits in register:\tt <reg> \r\n  Call function:\t\tc <name> \r\n");
+        usart_printf("Commands:\r\n  Read from register:\t\tr <reg>\r\n  Write to register:\t\tw <reg> <val>\r\n  Probe I2C addresses:\t\tp (probe)\r\n  Bulk read:\t\t\tb <reg>\r\n  Bulk write to register:\tn <reg> <val1> <val2> ...\r\n  Read bits in register:\tt <reg> \r\n  Status:\t\ts \r\n  Call function:\t\tc <name> \r\n");
     }
 }
 
