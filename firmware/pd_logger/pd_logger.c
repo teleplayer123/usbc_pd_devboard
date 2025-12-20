@@ -21,9 +21,10 @@
 volatile uint32_t system_millis;
 
 static struct fusb302_chip_state {
+    // CC1 = 0, CC2 = 1
 	int cc_polarity;
 	int vconn_enabled;
-	/* 1 = pulling up (DFP) 0 = pulling down (UFP) */
+	// pulling up (DFP) = 1, pulling down (UFP) = 0
 	int pulling_up;
 	int rx_enable;
 	uint8_t mdac_vnc;
@@ -680,6 +681,49 @@ static int fusb_set_cc(int pull)
             return -1;
     }
     return 0;
+}
+
+static void fusb_set_polarity(int polarity)
+{
+    // polarity = 0 means CC line is on CC1, polarity = 1 means CC line is on CC2
+    uint8_t reg;
+    // read switches0
+    reg = fusb_read(FUSB302_REG_SWITCHES0);
+    // clear vconn bits
+    reg &= ~(FUSB302_SW0_VCONN_CC1 | FUSB302_SW0_VCONN_CC2);
+    if (state.vconn_enabled) {
+        // set vconn to be opposite of cc line
+        if (polarity) {
+            reg |= FUSB302_SW0_VCONN_CC1;
+        } else {
+            reg |= FUSB302_SW0_VCONN_CC2;
+        }
+    }
+    // clear measure bits
+    reg &= ~(FUSB302_SW0_MEAS_CC1 | FUSB302_SW0_MEAS_CC2);
+    // select rx line (cc polarity)
+    if (polarity) {
+        reg |= FUSB302_SW0_MEAS_CC2;
+    } else {
+        reg |= FUSB302_SW0_MEAS_CC1;
+    }
+    // write rx selection to switches0
+    fusb_write(FUSB302_REG_SWITCHES0, reg);
+
+    // clear tx cc bits from switches1
+    reg = fusb_read(FUSB302_REG_SWITCHES1);
+    reg &= ~(FUSB302_SW1_TXCC1 | FUSB302_SW1_TXCC2);
+    // set tx polarity
+    if (polarity) {
+        reg |= FUSB302_SW1_TXCC2;
+    } else {
+        reg |= FUSB302_SW1_TXCC1;
+    }
+    // write tx selection to switches1
+    fusb_write(FUSB302_REG_SWITCHES1, reg);
+
+    // update and save polarity state
+    state.cc_polarity = polarity;
 }
 
 // function to print status info for debugging
