@@ -721,7 +721,7 @@ static void fusb_check_cc_pin_snk(void)
 {
     int cc1, cc2;
     fusb_measure_cc_pin_snk(&cc1, &cc2);
-    usart_printf("Sink CC1: 0x%02X CC2: 0x%02X\r\n");
+    usart_printf("Sink CC1: 0x%02X CC2: 0x%02X\r\n", cc1, cc2);
 }
 
 static int fusb_set_cc(int pull)
