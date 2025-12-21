@@ -673,6 +673,7 @@ static int fusb_set_cc(int pull)
             }
             fusb_write(FUSB302_REG_SWITCHES0, reg);
             state.pulling_up = 1;
+            usart_printf("CC set to type RP\r\n");
             break;
         case TYPEC_CC_RD:
             // enable UFP mode
@@ -687,6 +688,7 @@ static int fusb_set_cc(int pull)
             reg |= (FUSB302_SW0_PDWN1 | FUSB302_SW0_PDWN2);
             fusb_write(FUSB302_REG_SWITCHES0, reg);
             state.pulling_up = 0;
+            usart_printf("CC set to type RD\r\n");
             break;
         case TYPEC_CC_OPEN:
             // disable toggle
@@ -698,6 +700,7 @@ static int fusb_set_cc(int pull)
             reg &= ~(FUSB302_SW0_PU_EN1 | FUSB302_SW0_PU_EN2 | FUSB302_SW0_PDWN1 | FUSB302_SW0_PDWN2);
             fusb_write(FUSB302_REG_SWITCHES0, reg);
             state.pulling_up = 0;
+            usart_printf("CC set to type Open\r\n");
             break;
         default:
             // unsupported
