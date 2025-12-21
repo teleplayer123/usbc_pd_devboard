@@ -755,7 +755,7 @@ static void fusb_get_status(void)
     usart_printf("INT pin=%02X\r\n", gpio_get(GPIOB, GPIO8) ? 1 : 0);
     if (state.pulling_up) {
         // source
-        uint8_t cc_pin = fusb_check_cc_pin_src();
+        uint8_t cc_pin = fusb_check_cc_pin();
         usart_printf("Source CC pin: %02X\r\n", cc_pin);
     } else {
         // sink
