@@ -19,6 +19,21 @@
  * ------------------------------------------------------------ */
 
 volatile uint32_t system_millis;
+volatile bool fusb_event_pending;
+
+typedef struct {
+    uint16_t header;
+    uint32_t obj[7];
+} pd_msg_t;
+
+pd_msg_t last_caps;
+int last_pdo_count = 0;
+
+/* ---------------- State ---------------- */
+static uint8_t last_cc_state;
+static bool    vbus_present;
+static uint32_t vbus_rise_ms;
+static bool    first_pd_seen;
 
 /* ------------------------------------------------------------
  * MCU Setup Functions
@@ -93,18 +108,6 @@ static void exti_setup(void) {
 }
 
 /* ------------------------------------------------------------
- * PD Message Container
- * ------------------------------------------------------------ */
-
-typedef struct {
-    uint16_t header;
-    uint32_t obj[7];
-} pd_msg_t;
-
-pd_msg_t last_caps;
-int last_pdo_count = 0;
-
-/* ------------------------------------------------------------
  * Low-level helpers
  * ------------------------------------------------------------ */
 
@@ -166,7 +169,7 @@ static void hexdump(const uint8_t *data, size_t len) {
     }
 }
 
-static inline bool uart_rx_ready(void)
+static bool uart_rx_ready(void)
 {
     return usart_get_flag(USART2, USART_FLAG_RXNE);
 }
@@ -177,20 +180,20 @@ static void fusb_write(uint8_t reg, uint8_t val)
     i2c_transfer7(I2C1, FUSB302_ADDR, tx_buf, 2, NULL, 0);
 }
 
-static inline uint8_t fusb_read(uint8_t reg)
+static uint8_t fusb_read(uint8_t reg)
 {
     uint8_t v;
     i2c_transfer7(I2C1, FUSB302_ADDR, &reg, 1, &v, 1);
     return v;
 }
 
-static inline void fusb_read_fifo(uint8_t *buf, int len)
+static void fusb_read_fifo(uint8_t *buf, int len)
 {
     uint8_t r = FUSB302_REG_FIFOS;
     i2c_transfer7(I2C1, FUSB302_ADDR, &r, 1, buf, len);
 }
 
-static inline bool fusb_rx_empty(void)
+static bool fusb_rx_empty(void)
 {
     return fusb_read(FUSB302_REG_STATUS1) & FUSB302_STATUS1_RX_EMPTY;
 }
@@ -241,243 +244,145 @@ static void fusb_setup_sniffer() {
     usart_printf("FUSB302 configured for PD Sniffing.\n");
 }
 
-static void check_rx_buffer(void) {
-    uint8_t rx_buffer[80];
-    fusb_read_fifo(rx_buffer, 80);
-    hexdump(rx_buffer, 80);
+/* ============================================================
+ * EXTI — PB8 / INT_N  
+ * ============================================================ */
+
+void exti4_15_isr(void)
+{
+    if (exti_get_flag_status(EXTI8)) {
+        fusb_event_pending = true;
+        exti_reset_request(EXTI8);
+    }
 }
 
-static void fusb_get_status(void) {
-    uint8_t st0 = fusb_read(FUSB302_REG_STATUS0);
-    uint8_t st1 = fusb_read(FUSB302_REG_STATUS1);
-    usart_printf("FUSB STATUS0=0x%02X STATUS1=0x%02X\r\n", st0, st1);
-    check_rx_buffer();
-    usart_printf("INT pin=%02X\r\n", gpio_get(GPIOB, GPIO8) ? 1 : 0);
+/* ============================================================
+ * CC MEASUREMENT 
+ * ============================================================ */
+
+static uint8_t measure_cc(bool cc1)
+{
+    uint8_t sw = FUSB302_SW0_PDWN1 | FUSB302_SW0_PDWN2;
+
+    if (cc1)
+        sw |= FUSB302_SW0_MEAS_CC1;
+    else
+        sw |= FUSB302_SW0_MEAS_CC2;
+
+    fusb_write(FUSB302_REG_SWITCHES0, sw);
+
+    /* allow comparator to settle */
+    for (volatile int i = 0; i < 500; i++) __asm__("nop");
+
+    uint8_t st = fusb_read(FUSB302_REG_STATUS0);
+    return st & 0x03;   /* BC_LVL[1:0] */
 }
 
-/* ------------------------------------------------------------
- * PD RX
- * ------------------------------------------------------------ */
+static void log_cc_state(void)
+{
+    uint8_t bc1 = measure_cc(true);
+    uint8_t bc2 = measure_cc(false);
 
-static bool read_pd_message(pd_msg_t *pd)
+    uint8_t state = (bc1 ? 1 : 0) | (bc2 ? 2 : 0);
+    if (state == last_cc_state)
+        return;
+
+    last_cc_state = state;
+
+    if (bc1 && !bc2) {
+        usart_printf("[CC] Attached on CC1 (Rp=%u)", bc1);
+    } else if (!bc1 && bc2) {
+        usart_printf("[CC] Attached on CC2 (Rp=%u)", bc2);
+    } else if (!bc1 && !bc2) {
+        usart_printf("[CC] Detached");
+    } else {
+        usart_printf("[CC] Invalid (Rp on both CCs)");
+    }
+}
+
+/* ============================================================
+ * VBUS LOGGING
+ * ============================================================ */
+
+static void poll_vbus(void)
+{
+    uint8_t st = fusb_read(FUSB302_REG_STATUS0);
+    bool now = st & FUSB302_STATUS0_VBUSOK;
+
+    if (now && !vbus_present) {
+        vbus_present = true;
+        vbus_rise_ms = system_millis;
+        first_pd_seen = false;
+        usart_printf("[VBUS] PRESENT at %lu ms", vbus_rise_ms);
+    }
+
+    if (!now && vbus_present) {
+        vbus_present = false;
+        usart_printf("[VBUS] REMOVED at %lu ms", system_millis);
+    }
+}
+
+/* ============================================================
+ * PD RX (token‑aware, SOP only)
+ * ============================================================ */
+
+static void log_first_pd_timing(void)
+{
+    if (!first_pd_seen && vbus_present) {
+        uint32_t delta = system_millis - vbus_rise_ms;
+        usart_printf("[PD] First SOP packet after %lu ms from VBUS rise", delta);
+        first_pd_seen = true;
+    }
+}
+
+bool read_pd_message(pd_msg_t *pd)
 {
     uint8_t tok;
 
-    /* ------------------------------------------------
-     * Token-aware RX FIFO parsing (FUSB302)
-     * ------------------------------------------------
-     * FIFO format:
-     *   SOP token
-     *   PACKSYM (header)
-     *   2-byte PD header
-     *   PACKSYM (data) [optional]
-     *   data objects    [optional]
-     *   EOP token
-     */
-
-    // SOP token 
     fusb_read_fifo(&tok, 1);
-    usart_printf("PD Message Token: %02X\r\n", tok);
-    if ((tok & 0xE0) != FUSB302_RX_TKN_SOP) {
-        usart_printf("SOP not as expected: %02X\r\n", (tok & 0xE0));
+    if ((tok & 0xE0) != FUSB302_RX_TKN_SOP)
         return false;
-    }
 
-    // PACKSYM for header
     fusb_read_fifo(&tok, 1);
-    if ((tok & 0xE0) != FUSB302_RX_TKN_PACKSYM) {
-        usart_printf("PACKSYM not as expected: %02X\r\n", (tok & 0xE0));
+    if ((tok & 0xE0) != FUSB302_RX_TKN_PACKSYM)
         return false;
-    }
 
-    // Read PD header
     uint8_t hdr[2];
     fusb_read_fifo(hdr, 2);
     pd->header = hdr[0] | (hdr[1] << 8);
 
     int nobj = PD_HEADER_NUM_DATA_OBJECTS(pd->header);
-    if (nobj > 7)
-        nobj = 7; // safety clamp
+    if (nobj > 7) nobj = 7;
 
-    // Read data objects if present
-    if (nobj > 0) {
-        fusb_read_fifo(&tok, 1); // PACKSYM
-        if ((tok & 0xE0) != FUSB302_RX_TKN_PACKSYM) {
-            usart_printf("PACKSYM not as expected: %02X\r\n", (tok & 0xE0));
-        }
+    if (nobj) {
+        fusb_read_fifo(&tok, 1);
         fusb_read_fifo((uint8_t *)pd->obj, nobj * 4);
     }
 
-    // Drain until EOP
     do {
         fusb_read_fifo(&tok, 1);
-    } while (~((tok & 0xE0) & FUSB302_RX_TKN_EOP));
+    } while ((tok & 0xE0) != FUSB302_RX_TKN_EOP);
 
+    log_first_pd_timing();
     return true;
 }
 
-/* ------------------------------------------------------------
- * PD Decode Helpers
- * ------------------------------------------------------------ */
+/* ============================================================
+ * MAIN POLL ENTRY
+ * ============================================================ */
 
-static const char *pd_msg_name(uint8_t type, bool data)
+static void fusb_poll(void)
 {
-    if (!data) {
-        switch (type) {
-        case 0:  return "GoodCRC";
-        case 1:  return "GotoMin";
-        case 2:  return "Accept";
-        case 3:  return "Reject";
-        case 6:  return "PS_RDY";
-        case 7:  return "Get_Source_Cap";
-        case 8:  return "Get_Sink_Cap";
-        case 13: return "Soft_Reset";
-        default: return "Ctrl_Unknown";
-        }
-    } else {
-        switch (type) {
-        case 1:  return "Source_Capabilities";
-        case 2:  return "Request";
-        case 4:  return "Sink_Capabilities";
-        case 15: return "Vendor_Defined";
-        default: return "Data_Unknown";
+    log_cc_state();
+    poll_vbus();
+
+    if (!fusb_rx_empty()) {
+        pd_msg_t msg;
+        if (read_pd_message(&msg)) {
+            pd_log_message(&msg);
         }
     }
 }
-
-/* ------------------------------------------------------------
- * Verbose PD Sniffer Logger
- * ------------------------------------------------------------ */
-
-static void pd_sniffer_log(pd_msg_t *p)
-{
-    uint8_t type  = PD_HEADER_MESSAGE_TYPE(p->header);
-    uint8_t nobj  = PD_HEADER_NUM_DATA_OBJECTS(p->header);
-    bool data     = (nobj > 0);
-
-    uint8_t msgid = (p->header >> 9) & 0x7;
-    uint8_t prole = (p->header >> 8) & 0x1;
-    uint8_t drole = (p->header >> 5) & 0x1;
-    uint8_t rev   = (p->header >> 6) & 0x3;
-
-    usart_printf(
-        "[%8lu ms] PD RX | %s | ID=%d | %s | %s | Rev=%d | Obj=%d | HDR=0x%04X\r\n",
-        system_millis,
-        pd_msg_name(type, data),
-        msgid,
-        prole ? "SRC" : "SNK",
-        drole ? "DFP" : "UFP",
-        rev,
-        nobj,
-        p->header
-    );
-
-    for (int i = 0; i < nobj; i++) {
-        usart_printf("    OBJ%d: 0x%08lX\r\n", i + 1, p->obj[i]);
-
-        if (type == 1) {
-            int mv = ((p->obj[i] >> 10) & 0x3FF) * 50;
-            int ma = (p->obj[i] & 0x3FF) * 10;
-            usart_printf("        -> %d mV @ %d mA\r\n", mv, ma);
-        }
-
-        if (type == 2) {
-            int pdo = (p->obj[i] >> 28) & 0x7;
-            int ma  = ((p->obj[i] >> 10) & 0x3FF) * 10;
-            int mv  = (p->obj[i] & 0x3FF) * 50;
-            usart_printf("        -> Request PDO%d %d mV %d mA\r\n",
-                          pdo, mv, ma);
-        }
-    }
-}
-
-/* ------------------------------------------------------------
- * PD Actions
- * ------------------------------------------------------------ */
-
-static void pd_print_caps(void)
-{
-    usart_printf("\r\n=== Source Capabilities ===\r\n");
-    for (int i = 0; i < last_pdo_count; i++) {
-        uint32_t o = last_caps.obj[i];
-        int mv = ((o >> 10) & 0x3FF) * 50;
-        int ma = (o & 0x3FF) * 10;
-        usart_printf(" PDO%d: %d mV %d mA\r\n", i + 1, mv, ma);
-    }
-}
-
-static void pd_send_request(int pdo, int mv, int ma)
-{
-    uint16_t hdr = (1 << 12); /* one data object */
-    uint32_t rdo = ((pdo + 1) << 28) | ((ma / 10) << 10) | (mv / 50);
-
-    uint8_t tx[20];
-    int i = 0;
-
-    tx[i++] = FUSB302_TX_TKN_SOP1;
-    tx[i++] = FUSB302_TX_TKN_PACKSYM | 2;
-    tx[i++] = hdr & 0xFF;
-    tx[i++] = hdr >> 8;
-
-    tx[i++] = FUSB302_TX_TKN_PACKSYM | 4;
-    memcpy(&tx[i], &rdo, 4); i += 4;
-
-    tx[i++] = FUSB302_TX_TKN_JAMCRC;
-    tx[i++] = FUSB302_TX_TKN_EOP;
-    tx[i++] = FUSB302_TX_TKN_TXOFF;
-    tx[i++] = FUSB302_TX_TKN_TXON;
-
-    uint8_t r = FUSB302_REG_FIFOS;
-    i2c_transfer7(I2C1, FUSB302_ADDR, &r, 1, tx, i);
-    fusb_write(FUSB302_REG_CONTROL0, FUSB302_CTL0_TX_START);
-
-    usart_printf("PD: Requesting %d mV %d mA\r\n", mv, ma);
-}
-
-/* ------------------------------------------------------------
- * PD Dispatcher
- * ------------------------------------------------------------ */
-
-static void handle_pd_message(pd_msg_t *p)
-{
-    pd_sniffer_log(p);
-
-    uint8_t type = PD_HEADER_MESSAGE_TYPE(p->header);
-
-    if (type == 1) {
-        last_caps = *p;
-        last_pdo_count = PD_HEADER_NUM_DATA_OBJECTS(p->header);
-        pd_print_caps();
-    }
-    else if (type == 3)
-        usart_printf("PD: ACCEPT\r\n");
-    else if (type == 6)
-        usart_printf("PD: PS_RDY\r\n");
-}
-
-/* ------------------------------------------------------------
- * EXTI ISR
- * ------------------------------------------------------------ */
-
-void exti4_15_isr(void)
-{
-    usart_printf("EXTI handler triggered!\r\n");
-    while (1) {
-        if (exti_get_flag_status(EXTI8)) {
-            /* USB-PD handling */
-            pd_msg_t msg;
-            if (read_pd_message(&msg))
-                handle_pd_message(&msg);
-
-            exti_reset_request(EXTI8);
-        }
-    }
-}
-
-
-/* ------------------------------------------------------------
- * Main
- * ------------------------------------------------------------ */
 
 int main(void)
 {
@@ -492,7 +397,7 @@ int main(void)
     while (1) {
         // debug in main loop
         usart_printf("Systick: %02X\r\n", system_millis);
-        fusb_get_status();
-        fusb_delay_ms(3000);
+        fusb_poll();
+        fusb_delay_ms(500);
     }
 }
