@@ -646,7 +646,7 @@ static void fusb_detect_cc_pin_src(uint8_t *cc1, uint8_t *cc2)
     }
 }
 
-static void fusb_get_cc(int *cc1, int *cc2)
+static void fusb_get_cc(uint8_t *cc1, uint8_t *cc2)
 {
     if (state.pulling_up) {
         // source
