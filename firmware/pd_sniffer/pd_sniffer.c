@@ -262,21 +262,35 @@ void exti4_15_isr(void)
 
 static uint8_t measure_cc(bool cc1)
 {
-    uint8_t sw = FUSB302_SW0_PDWN1 | FUSB302_SW0_PDWN2;
+    uint8_t sw0 = fusb_read(FUSB302_REG_SWITCHES0);
 
-    if (cc1)
-        sw |= FUSB302_SW0_MEAS_CC1;
-    else
-        sw |= FUSB302_SW0_MEAS_CC2;
+    /* Save current Rd state */
+    uint8_t saved_pdwn =
+        sw0 & (FUSB302_SW0_PDWN1 | FUSB302_SW0_PDWN2);
 
-    fusb_write(FUSB302_REG_SWITCHES0, sw);
+    /* Disable Rd while measuring */
+    sw0 &= ~(FUSB302_SW0_PDWN1 | FUSB302_SW0_PDWN2);
 
-    /* allow comparator to settle */
+    /* Select CC to measure */
+    sw0 &= ~(FUSB302_SW0_MEAS_CC1 | FUSB302_SW0_MEAS_CC2);
+    sw0 |= cc1 ? FUSB302_SW0_MEAS_CC1 : FUSB302_SW0_MEAS_CC2;
+
+    fusb_write(FUSB302_REG_SWITCHES0, sw0);
+
+    /* Comparator settle time */
     for (volatile int i = 0; i < 500; i++) __asm__("nop");
 
     uint8_t st = fusb_read(FUSB302_REG_STATUS0);
-    return st & 0x03;   /* BC_LVL[1:0] */
+    uint8_t bc = st & 0x03;  /* BC_LVL */
+
+    /* Restore Rd */
+    fusb_write(FUSB302_REG_SWITCHES0,
+               (sw0 & ~(FUSB302_SW0_MEAS_CC1 | FUSB302_SW0_MEAS_CC2)) |
+               saved_pdwn);
+
+    return bc;
 }
+
 
 static void log_cc_state(void)
 {

@@ -541,7 +541,7 @@ static void fusb_measure_cc_pin_snk(uint8_t *cc1, uint8_t *cc2)
     fusb_delay_us(250);
     // Read cc1 measurement
     bc_lvl_cc1 = fusb_read(FUSB302_REG_STATUS0);
-    // Mask unwanted bits
+    // Read bc_lvl 
     bc_lvl_cc1 &= (FUSB302_STATUS0_BC_LVL0 | FUSB302_STATUS0_BC_LVL1);
     usart_printf("CC1 Sink BC_LVL: %02X\r\n", bc_lvl_cc1);
 
@@ -555,14 +555,14 @@ static void fusb_measure_cc_pin_snk(uint8_t *cc1, uint8_t *cc2)
     fusb_delay_us(250);
     // Read cc2 measurement
     bc_lvl_cc2 = fusb_read(FUSB302_REG_STATUS0);
-    // Mask unwanted bits
+    // Read bc_lvl
     bc_lvl_cc2 &= (FUSB302_STATUS0_BC_LVL0 | FUSB302_STATUS0_BC_LVL1);
     usart_printf("CC2 Sink BC_LVL: %02X\r\n", bc_lvl_cc2);
 
     *cc1 = convert_bc_lvl(bc_lvl_cc1);
     *cc2 = convert_bc_lvl(bc_lvl_cc2);
 
-    // Reset MEAS switches to original state
+    // Restore switches0 to orignal state
     reg = fusb_read(FUSB302_REG_SWITCHES0);
     if (orig_cc1) {
         reg |= FUSB302_SW0_MEAS_CC1;
@@ -590,14 +590,15 @@ static void fusb_enable_gcrc(bool enable)
 
 static int fusb_check_cc_pin_snk(void)
 {
-    int ret = 0;
+    // return 0 for cc1, 1 for cc2
+    int ret = 0; // default cc1
     uint8_t cc1, cc2;
     fusb_measure_cc_pin_snk(&cc1, &cc2);
     if (cc1 > cc2) {
-        ret = 1;
+        ret = 0;
         state.cc_polarity = 0;
     } else {
-        ret = 2;
+        ret = 1;
         state.cc_polarity = 1;
     }
     return ret;
@@ -605,16 +606,17 @@ static int fusb_check_cc_pin_snk(void)
 
 static int fusb_check_cc_pin(void)
 {
-    int ret = 0;
+    // return 0 for cc1, 1 for cc2
+    int ret = 0; // default cc1
     if (state.pulling_up) {
         // measure cc line for source
         int cc1_lvl = fusb_measure_cc_pin_src(FUSB302_SW0_MEAS_CC1);
         int cc2_lvl = fusb_measure_cc_pin_src(FUSB302_SW0_MEAS_CC2);
         if (cc1_lvl != TYPEC_CC_VOLT_OPEN && cc2_lvl == TYPEC_CC_VOLT_OPEN) {
-            ret = 1; // Device detected on CC1
+            ret = 0; // Device detected on CC1
             state.cc_polarity = 0;
         } else if (cc2_lvl != TYPEC_CC_VOLT_OPEN && cc1_lvl == TYPEC_CC_VOLT_OPEN) {
-            ret = 2; // Device detected on CC2
+            ret = 1; // Device detected on CC2
             state.cc_polarity = 1;
         }
     } else {
@@ -778,13 +780,26 @@ static int fusb_int_vbusok(void)
 void exti4_15_isr(void)
 {
     usart_printf("EXTI handler triggered!\r\n");
+    int state_changed = 0;
     while (1) {
         if (exti_get_flag_status(EXTI8)) {
             int attached = fusb_int_vbusok();
             if (state.attached != attached) {
                 state.attached = attached;
+                state_changed = 1;
                 usart_printf("[Interupt] Attached state change: 0x%02X\r\n", attached);
+            
+                int polarity = fusb_check_cc_pin();
+                if (state.cc_polarity != polarity) {
+                    fusb_set_polarity(polarity);
+                    int pull = state.pulling_up;
+                    fusb_set_cc(pull);
+                }
             }
+            if (state_changed) {
+                fusb_current_state();
+            }
+            state_changed = 0;
             exti_reset_request(EXTI8);
         }
     }
