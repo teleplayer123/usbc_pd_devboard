@@ -777,31 +777,29 @@ static int fusb_int_vbusok(void)
     }
 }
 
-void exti4_15_isr(void)
+static void poll(void)
 {
-    usart_printf("EXTI handler triggered!\r\n");
     int state_changed = 0;
-    while (1) {
-        if (exti_get_flag_status(EXTI8)) {
-            int attached = fusb_int_vbusok();
-            if (state.attached != attached) {
-                state.attached = attached;
-                state_changed = 1;
-                usart_printf("[Interupt] Attached state change: 0x%02X\r\n", attached);
-            
-                int polarity = fusb_check_cc_pin();
-                if (state.cc_polarity != polarity) {
-                    fusb_set_polarity(polarity);
-                    int pull = state.pulling_up;
-                    fusb_set_cc(pull);
-                }
-            }
-            if (state_changed) {
-                fusb_current_state();
-            }
-            state_changed = 0;
-            exti_reset_request(EXTI8);
+
+    int attached = fusb_int_vbusok();
+    if (state.attached != attached) {
+        state.attached = attached;
+        state_changed = 1;
+        usart_printf("Attach detected: 0x%02X\r\n", attached);
+        usart_printf("Detecting CC pin...\r\n");
+        int polarity = fusb_check_cc_pin();
+        if (state.cc_polarity != polarity) {
+            int cc_n = polarity ? 2 : 1;
+            usart_printf("CC polarity changed to CC%d\r\n", cc_n);
+            fusb_set_polarity(polarity);
+            int pull = state.pulling_up;
+            fusb_set_cc(pull);
         }
+    }
+    if (state_changed) {
+        fusb_current_state();
+        fusb_get_status();
+        state_changed = 0;
     }
 }
 
@@ -823,7 +821,7 @@ int main(void)
                 usart_getc();
             } 
         }
-        fusb_get_status();
-        fusb_delay_ms(3000);
+        poll();
+        fusb_delay_ms(1000);
     }
 }
