@@ -777,15 +777,19 @@ static void poll(void)
     int attached = fusb_int_vbusok();
     if (state.attached != attached) {
         state.attached = attached;
-        usart_printf("Attach detected: 0x%02X\r\n", attached);
-        usart_printf("Detecting CC pin...\r\n");
-        int polarity = fusb_check_cc_pin();
-        int cc_n = polarity ? 2 : 1;
-        usart_printf("CC line on CC%d\r\n", cc_n);
-        fusb_set_polarity(polarity);
-        int pull = state.pulling_up;
-        fusb_set_cc(pull);
-        fusb_get_status();
+        if (attached) {
+            usart_printf("Attach detected: 0x%02X\r\n", attached);
+            usart_printf("Detecting CC pin...\r\n");
+            int polarity = fusb_check_cc_pin();
+            int cc_n = polarity ? 2 : 1;
+            usart_printf("CC line on CC%d\r\n", cc_n);
+            fusb_set_polarity(polarity);
+            int pull = state.pulling_up;
+            fusb_set_cc(pull);
+            fusb_get_status();
+        } else {
+            usart_printf("Dettach detected\r\n");
+        }
     }
 }
 
