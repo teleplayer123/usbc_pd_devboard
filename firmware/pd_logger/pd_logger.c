@@ -792,6 +792,7 @@ static void poll(void)
             fusb_get_status();
         } else {
             usart_printf("Dettach detected\r\n");
+            fusb_pd_reset();
         }
     }
 }
