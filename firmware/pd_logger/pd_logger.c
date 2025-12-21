@@ -752,18 +752,12 @@ static void fusb_set_polarity(int polarity)
 // function to print status info for debugging
 static void fusb_get_status(void)
 {
-    check_rx_buffer();
     fusb_check_status_regs();
     usart_printf("INT pin=%02X\r\n", gpio_get(GPIOB, GPIO8) ? 1 : 0);
-    if (state.pulling_up) {
-        // source
-        uint8_t cc_pin = fusb_check_cc_pin();
-        usart_printf("Source CC pin: %02X\r\n", cc_pin);
-    } else {
-        // sink
-        fusb_check_cc_pin_snk();
-    }
     fusb_current_state();
+    if (!fusb_rx_empty()) {
+        check_rx_buffer();
+    }
 }
 
 static int fusb_int_vbusok(void)
@@ -788,16 +782,14 @@ static void poll(void)
         usart_printf("Attach detected: 0x%02X\r\n", attached);
         usart_printf("Detecting CC pin...\r\n");
         int polarity = fusb_check_cc_pin();
-        if (state.cc_polarity != polarity) {
-            int cc_n = polarity ? 2 : 1;
-            usart_printf("CC polarity changed to CC%d\r\n", cc_n);
-            fusb_set_polarity(polarity);
-            int pull = state.pulling_up;
-            fusb_set_cc(pull);
-        }
+        int cc_n = polarity ? 2 : 1;
+        usart_printf("CC line on CC%d\r\n", cc_n);
+        fusb_set_polarity(polarity);
+        int pull = state.pulling_up;
+        fusb_set_cc(pull);
+
     }
     if (state_changed) {
-        fusb_current_state();
         fusb_get_status();
         state_changed = 0;
     }
