@@ -808,6 +808,13 @@ int main(void)
     fusb_setup();
 
     while (1) {
+        if (usart_rx_ready()) {
+            char c = usart_recv(USART2);
+            if (c=='\r' || c=='\n') {
+                usart_printf("Logging paused. Press Enter to continue...\r\n");
+                usart_getc();
+            } 
+        }
         poll();
         fusb_delay_ms(1000);
     }
