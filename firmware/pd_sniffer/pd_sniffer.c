@@ -361,10 +361,77 @@ bool read_pd_message(pd_msg_t *pd)
 
     do {
         fusb_read_fifo(&tok, 1);
-    } while ((tok & 0xE0) != FUSB302_RX_TKN_EOP);
+    } while ((tok & 0xD0) != FUSB302_RX_TKN_EOP);
 
     log_first_pd_timing();
     return true;
+}
+
+static const char *pd_msg_name(uint8_t type, bool data)
+{
+    if (!data) {
+        switch (type) {
+        case 0:  return "GoodCRC";
+        case 1:  return "GotoMin";
+        case 2:  return "Accept";
+        case 3:  return "Reject";
+        case 6:  return "PS_RDY";
+        case 7:  return "Get_Source_Cap";
+        case 8:  return "Get_Sink_Cap";
+        case 13: return "Soft_Reset";
+        default: return "Ctrl_Unknown";
+        }
+    } else {
+        switch (type) {
+        case 1:  return "Source_Capabilities";
+        case 2:  return "Request";
+        case 4:  return "Sink_Capabilities";
+        case 15: return "Vendor_Defined";
+        default: return "Data_Unknown";
+        }
+    }
+}
+
+static void pd_log_message(pd_msg_t *p)
+{
+    uint8_t type  = PD_HEADER_MESSAGE_TYPE(p->header);
+    uint8_t nobj  = PD_HEADER_NUM_DATA_OBJECTS(p->header);
+    bool data     = (nobj > 0);
+
+    uint8_t msgid = (p->header >> 9) & 0x7;
+    uint8_t prole = (p->header >> 8) & 0x1;
+    uint8_t drole = (p->header >> 5) & 0x1;
+    uint8_t rev   = (p->header >> 6) & 0x3;
+
+    usart_printf(
+        "[%8lu ms] PD RX | %s | ID=%d | %s | %s | Rev=%d | Obj=%d | HDR=0x%04X\r\n",
+        system_millis,
+        pd_msg_name(type, data),
+        msgid,
+        prole ? "SRC" : "SNK",
+        drole ? "DFP" : "UFP",
+        rev,
+        nobj,
+        p->header
+    );
+
+    for (int i = 0; i < nobj; i++) {
+        usart_printf("    OBJ%d: 0x%08lX\r\n", i + 1, p->obj[i]);
+
+        if (type == 1) {
+            int mv = ((p->obj[i] >> 10) & 0x3FF) * 50;
+            int ma = (p->obj[i] & 0x3FF) * 10;
+            usart_printf("        -> %d mV @ %d mA\r\n", mv, ma);
+        }
+
+        if (type == 2) {
+            int pdo = (p->obj[i] >> 28) & 0x7;
+            int ma  = ((p->obj[i] >> 10) & 0x3FF) * 10;
+            int mv  = (p->obj[i] & 0x3FF) * 50;
+            usart_printf("        -> Request PDO%d %d mV %d mA\r\n",
+                          pdo, mv, ma);
+        }
+    }
 }
 
 /* ============================================================
