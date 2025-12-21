@@ -771,14 +771,12 @@ static int fusb_int_vbusok(void)
     }
 }
 
+// poll function to get/set changes in state
 static void poll(void)
 {
-    int state_changed = 0;
-
     int attached = fusb_int_vbusok();
     if (state.attached != attached) {
         state.attached = attached;
-        state_changed = 1;
         usart_printf("Attach detected: 0x%02X\r\n", attached);
         usart_printf("Detecting CC pin...\r\n");
         int polarity = fusb_check_cc_pin();
@@ -787,11 +785,7 @@ static void poll(void)
         fusb_set_polarity(polarity);
         int pull = state.pulling_up;
         fusb_set_cc(pull);
-
-    }
-    if (state_changed) {
         fusb_get_status();
-        state_changed = 0;
     }
 }
 
