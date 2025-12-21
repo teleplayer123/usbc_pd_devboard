@@ -29,6 +29,8 @@ static struct fusb302_chip_state {
 	int rx_enable;
 	uint8_t mdac_vnc;
 	uint8_t mdac_rd;
+    // device attached = 1, no device attached = 0
+    int attached;
 } state;
 
 /* ------------------------------------------------------------
@@ -289,25 +291,12 @@ static void fusb_current_state(void)
     usart_printf("RX Enable: %d\r\n", state.rx_enable);
     usart_printf("MDAC VNC: 0x%02X\r\n", state.mdac_vnc);
     usart_printf("MDAC RD: 0x%02X\r\n", state.mdac_rd);
+    if (state.attached) {
+        usart_printf("Device Attached: True\r\n");
+    } else {
+        usart_printf("Device Attached: False\r\n");
+    }
     usart_printf("---- End State ----\r\n");
-}
-
-static void fusb_init_sink(void)
-{
-    // Enable reception of all SOP packets
-    fusb_write(FUSB302_REG_CONTROL1, FUSB302_CTL1_ENSOP1 | FUSB302_CTL1_ENSOP2 | FUSB302_CTL1_ENSOP1DB | FUSB302_CTL1_ENSOP2DB);
-
-    // Enable Auto-CRC, Set sink role
-    fusb_write(FUSB302_REG_SWITCHES1, FUSB302_SW1_AUTO_GCRC | FUSB302_SW1_SPECREV1 | FUSB302_SW1_SPECREV0);
-    // Toggle to detect CC and establish UFP (Sink)
-    fusb_write(FUSB302_REG_CONTROL2, FUSB302_CTL2_MODE_UFP | FUSB302_CTL2_WAKE_EN | FUSB302_CTL2_TOGGLE);
-
-    // Configure Switches0: Enable measurement (passive detection) on CC1 and CC2
-    uint8_t reg = fusb_read(FUSB302_REG_SWITCHES0);
-    reg |= (FUSB302_SW0_MEAS_CC1 | FUSB302_SW0_MEAS_CC2 | FUSB302_SW0_PDWN1 | FUSB302_SW0_PDWN2);
-    fusb_write(FUSB302_REG_SWITCHES0, reg);
-
-    usart_printf("FUSB302 initialized in Sink mode.\n");
 }
 
 static void fusb_setup_sniffer(void)
@@ -361,6 +350,24 @@ static void fusb_setup_sniffer(void)
     usart_printf("FUSB302 configured for PD Sniffing.\n");
 }
 
+static void fusb_init_sink(void)
+{
+    // CONTROL1 Enable reception of all SOP packets
+    fusb_write(FUSB302_REG_CONTROL1, FUSB302_CTL1_ENSOP1 | FUSB302_CTL1_ENSOP2 | FUSB302_CTL1_ENSOP1DB | FUSB302_CTL1_ENSOP2DB);
+
+    // SWITCHES1 Enable Auto-CRC, Set sink role
+    fusb_write(FUSB302_REG_SWITCHES1, FUSB302_SW1_AUTO_GCRC | FUSB302_SW1_SPECREV1 | FUSB302_SW1_SPECREV0);
+    // CONTROL2 Toggle to detect CC and establish UFP (Sink)
+    fusb_write(FUSB302_REG_CONTROL2, FUSB302_CTL2_MODE_UFP | FUSB302_CTL2_WAKE_EN | FUSB302_CTL2_TOGGLE);
+
+    // SWITCHES0 Enable measurement (passive detection) on CC1 and CC2
+    uint8_t reg = fusb_read(FUSB302_REG_SWITCHES0);
+    reg |= (FUSB302_SW0_MEAS_CC1 | FUSB302_SW0_MEAS_CC2 | FUSB302_SW0_PDWN1 | FUSB302_SW0_PDWN2);
+    fusb_write(FUSB302_REG_SWITCHES0, reg);
+
+    usart_printf("FUSB302 initialized in Sink mode.\n");
+}
+
 static void fusb_setup(void)
 {
     uint8_t reg;
@@ -374,7 +381,7 @@ static void fusb_setup(void)
     // Power all
     fusb_power_all();
 
-    // Turn on retries and set number of retries
+    // CONTROL3 Turn on retries and set number of retries
     reg = fusb_read(FUSB302_REG_CONTROL3);
     reg |= (FUSB302_CTL3_AUTO_RETRY | FUSB302_CTL3_NRETRIES_MASK);
     fusb_write(FUSB302_REG_CONTROL3, reg);
@@ -399,19 +406,20 @@ static void fusb_setup(void)
     reg &= ~FUSB302_MASKA_HARDRST;
     fusb_write(FUSB302_REG_MASKA, reg);
     
-    // Mask GoodCRC to ack pd message
+    // MaskB GoodCRC to ack pd message
     reg = 0xFF;
     reg &= ~FUSB302_MASKB_GCRCSENT;
     fusb_write(FUSB302_REG_MASKB, reg);
 
-    // Enable interrupt
+    // CONTROL0 Enable interrupt
     reg = fusb_read(FUSB302_REG_CONTROL0);
     reg &= ~FUSB302_CTL0_INT_MASK;
     fusb_write(FUSB302_REG_CONTROL0, reg);
 
-    // Set VCONN and polarity defaults
+    // Set state defaults
     state.vconn_enabled = 0;
     state.cc_polarity = 0;
+    state.attached = 0;
 }
 
 static void fusb_check_status_regs(void)
@@ -580,16 +588,37 @@ static void fusb_enable_gcrc(bool enable)
     }
 }
 
-// function for debugging info
-static int fusb_check_cc_pin_src(void)
+static int fusb_check_cc_pin_snk(void)
 {
     int ret = 0;
-    int cc1_lvl = fusb_measure_cc_pin_src(FUSB302_SW0_MEAS_CC1);
-    int cc2_lvl = fusb_measure_cc_pin_src(FUSB302_SW0_MEAS_CC2);
-    if (cc1_lvl != TYPEC_CC_VOLT_OPEN && cc2_lvl == TYPEC_CC_VOLT_OPEN) {
-        ret = 1; // Device detected on CC1
-    } else if (cc2_lvl != TYPEC_CC_VOLT_OPEN && cc1_lvl == TYPEC_CC_VOLT_OPEN) {
-        ret = 2; // Device detected on CC2
+    uint8_t cc1, cc2;
+    fusb_measure_cc_pin_snk(&cc1, &cc2);
+    if (cc1 > cc2) {
+        ret = 1;
+        state.cc_polarity = 0;
+    } else {
+        ret = 2;
+        state.cc_polarity = 1;
+    }
+    return ret;
+}
+
+static int fusb_check_cc_pin(void)
+{
+    int ret = 0;
+    if (state.pulling_up) {
+        // measure cc line for source
+        int cc1_lvl = fusb_measure_cc_pin_src(FUSB302_SW0_MEAS_CC1);
+        int cc2_lvl = fusb_measure_cc_pin_src(FUSB302_SW0_MEAS_CC2);
+        if (cc1_lvl != TYPEC_CC_VOLT_OPEN && cc2_lvl == TYPEC_CC_VOLT_OPEN) {
+            ret = 1; // Device detected on CC1
+            state.cc_polarity = 0;
+        } else if (cc2_lvl != TYPEC_CC_VOLT_OPEN && cc1_lvl == TYPEC_CC_VOLT_OPEN) {
+            ret = 2; // Device detected on CC2
+            state.cc_polarity = 1;
+        }
+    } else {
+        ret = fusb_check_cc_pin_snk();
     }
     return ret;
 }
@@ -624,14 +653,6 @@ static void fusb_get_cc(int *cc1, int *cc2)
         // sink
         fusb_measure_cc_pin_snk(cc1, cc2);
     }
-}
-
-// function for debugging info
-static void fusb_check_cc_pin_snk(void)
-{
-    uint8_t cc1, cc2;
-    fusb_measure_cc_pin_snk(&cc1, &cc2);
-    usart_printf("Sink CC1: 0x%02X CC2: 0x%02X\r\n", cc1, cc2);
 }
 
 static int fusb_set_cc(int pull)
@@ -743,6 +764,32 @@ static void fusb_get_status(void)
     fusb_current_state();
 }
 
+static int fusb_int_vbusok(void)
+{
+    // return 1 for vbusok else 0
+    uint8_t reg = fusb_read(FUSB302_REG_INTERRUPT);
+    if (reg & FUSB302_INT_VBUSOK) {
+        return 1;
+    } else {
+        return 0;
+    }
+}
+
+void exti4_15_isr(void)
+{
+    usart_printf("EXTI handler triggered!\r\n");
+    while (1) {
+        if (exti_get_flag_status(EXTI8)) {
+            int attached = fusb_int_vbusok();
+            if (state.attached != attached) {
+                state.attached = attached;
+                usart_printf("[Interupt] Attached state change: 0x%02X\r\n", attached);
+            }
+            exti_reset_request(EXTI8);
+        }
+    }
+}
+
 int main(void)
 {
     clock_setup();
@@ -751,7 +798,7 @@ int main(void)
     i2c_setup();
     exti_setup(); 
 
-    fusb_setup_sniffer();
+    fusb_setup();
 
     while (1) {
         if (usart_rx_ready()) {
@@ -762,6 +809,6 @@ int main(void)
             } 
         }
         fusb_get_status();
-        fusb_delay_ms(1000);
+        fusb_delay_ms(3000);
     }
 }
