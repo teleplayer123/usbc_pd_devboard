@@ -775,7 +775,7 @@ static int fusb_int_vbusok(void)
 static void poll(void)
 {
     int attached = fusb_int_vbusok();
-    if (state.attached != attached) {
+    if (attached != state.attached) {
         state.attached = attached;
         if (attached) {
             usart_printf("Attach detected: 0x%02X\r\n", attached);
@@ -789,6 +789,7 @@ static void poll(void)
             fusb_get_status();
         } else {
             usart_printf("Dettach detected\r\n");
+            fusb_pd_reset();
         }
     }
 }
