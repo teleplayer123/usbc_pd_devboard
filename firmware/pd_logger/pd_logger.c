@@ -662,7 +662,10 @@ static void poll(void)
             fusb_get_status();
         } else {
             usart_printf("Dettach detected\r\n");
+            // set default state
             state.attached = 0;
+            state.cc_polarity = 0;
+            state.vconn_enabled = 0;
             fusb_pd_reset();
         }
     }
