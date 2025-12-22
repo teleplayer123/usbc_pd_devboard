@@ -652,8 +652,8 @@ static void poll(void)
 {
     int attached = fusb_int_vbusok();
     if (attached != state.attached) {
-        state.attached = attached;
         if (attached) {
+            state.attached = 1;
             usart_printf("Attach detected: 0x%02X\r\n", attached);
             usart_printf("Detecting CC pin...\r\n");
             int polarity = fusb_check_cc_pin();
@@ -662,7 +662,69 @@ static void poll(void)
             fusb_get_status();
         } else {
             usart_printf("Dettach detected\r\n");
+            state.attached = 0;
             fusb_pd_reset();
+        }
+    }
+}
+
+// CLI parser
+static int handle_command(char *line) {
+    if (line[0] == 'r') {
+        uint8_t reg = (uint8_t)strtol(&line[1], NULL, 0);
+        uint8_t val = fusb_read(reg);
+        usart_printf("read[0x%02X] = 0x%02X\r\n", reg, val);
+    } else if (line[0] == 'w') {
+        char *p = strtok(&line[1], " ");
+        if (!p) { usart_printf("usage: w <reg> <val>\r\n"); return 0; }
+        uint8_t reg = (uint8_t)strtol(p, NULL, 0);
+        p = strtok(NULL, " ");
+        if (!p) { usart_printf("usage: w <reg> <val>\r\n"); return 0; }
+        uint8_t val = (uint8_t)strtol(p, NULL, 0);
+        fusb_write(reg, val);
+        usart_printf("write[0x%02X] = 0x%02X\r\n", reg, val);
+    } else if (line[0] == 't') {
+        // Print bits set in register
+        uint8_t reg = (uint8_t)strtol(&line[1], NULL, 0);
+        uint8_t val = fusb_read(reg);
+        print_byte_as_bits(val, reg);
+    } else if (line[0] == 's') {
+        fusb_get_status();
+        check_rx_buffer();
+    } else if (line[0] == 'q') {
+        // return 1 to tell debug_cli to break loop and return to logging
+        return 1;
+    } else {
+        usart_printf("Commands:\r\n  Read from register:\t\tr <reg>\r\n  Write to register:\t\tw <reg> <val>\r\n  Read bits in register:\tt <reg> \r\n  Status:\t\t\ts \r\n  Quit:\t\t\t\tq  \r\n");
+    }
+    return 0;
+}
+
+static void debug_cli(void)
+{
+    usart_printf("---- PD Logger Debug Console ----\r\n");
+    char line[32];
+    int pos = 0;
+
+    while (1) {
+        // UART CLI Non-Blocking
+        if (usart_rx_ready()) {
+            char c = usart_recv(USART2);
+            if (c=='\r' || c=='\n') {
+                line[pos] = 0;
+                usart_printf("\r\n");
+                int break_signal = handle_command(line);
+                if (break_signal) {
+                    usart_printf("Returning to live logging...\r\n");
+                    break;
+                }
+                pos = 0;
+                usart_printf("> ");
+            } 
+            else if (pos < (int)sizeof(line)-1) {
+                usart_send_blocking(USART2, c);  // echo character
+                line[pos++] = c;
+            }
         }
     }
 }
@@ -681,8 +743,8 @@ int main(void)
         if (usart_rx_ready()) {
             char c = usart_recv(USART2);
             if (c=='\r' || c=='\n') {
-                usart_printf("Logging paused. Press Enter to continue...\r\n");
-                usart_getc();
+                usart_printf("Logging paused. Entering debug menu...\r\n");
+                debug_cli();
             } 
         }
         poll();
