@@ -625,6 +625,21 @@ static int fusb_check_cc_pin(void)
     return ret;
 }
 
+static int fusb_mdac_comp(int mdac)
+{
+    int orig_reg, reg;
+    // save original REG_MEASURE register
+    orig_reg = fusb_read(FUSB302_REG_MEASURE);
+    // set mdac to reg_measure bits 0-5 and set bit 6 to measure vbus
+    fusb_write(FUSB302_REG_MEASURE, (FUSB302_MEAS_MDAC_MV(mdac) | FUSB302_MEAS_VBUS));
+    fusb_delay_us(350);
+    // Read status0 register, if STATUS0_COMP=1 then vbus is higher than (mdac + 1) * 0.42V
+    reg = fusb_read(FUSB302_REG_STATUS0);
+    // restore original value
+    fusb_write(FUSB302_REG_MEASURE, orig_reg);
+    return reg & FUSB302_STATUS0_COMP;
+}
+
 // function to print status info for debugging
 static void fusb_get_status(void)
 {
