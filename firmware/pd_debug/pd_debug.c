@@ -777,6 +777,20 @@ static int fusb_set_cc(int pull)
     return 0;
 }
 
+static void fusb_sop_prime_enable(void)
+{
+    int reg = fusb_read(FUSB302_REG_CONTROL1);
+    reg |= (FUSB302_CTL1_ENSOP1 | FUSB302_CTL1_ENSOP2);
+    fusb_write(FUSB302_REG_CONTROL1, reg);
+}
+
+static void fusb_sop_prime_disable(void)
+{
+    int reg = fusb_read(FUSB302_REG_CONTROL1);
+    reg &= ~(FUSB302_CTL1_ENSOP1 | FUSB302_CTL1_ENSOP2);
+    fusb_write(FUSB302_REG_CONTROL1, reg);
+}
+
 // function to print status info for debugging
 static void fusb_get_status(void)
 {
