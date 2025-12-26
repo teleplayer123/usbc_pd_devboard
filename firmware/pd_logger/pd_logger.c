@@ -698,6 +698,17 @@ static int fusb_int_vbusok(void)
     }
 }
 
+static int fusb_check_cc_voltage(void)
+{
+    bool cc1;
+    if (state.cc_polarity)
+        cc1 = false;
+    else
+        cc1 = true;
+    int cc_mvolt = fusb_measure_cc_voltage(cc1);
+    return cc_mvolt;
+}
+
 // function to print status info for debugging
 static void fusb_get_status(void)
 {
@@ -709,13 +720,8 @@ static void fusb_get_status(void)
     }
     int vbus_voltage = fusb_measure_vbus_voltage();
     usart_printf("VBUS Voltage: %d mV\r\n", vbus_voltage);
-    bool cc1;
-    if (state.cc_polarity)
-        cc1 = false;
-    else
-        cc1 = true;
-    int cc_mvolt = fusb_measure_cc_voltage(cc1);
-    usart_printf("CC voltage: %d mV\r\n", cc_mvolt);
+    int cc_volt = fusb_check_cc_voltage();
+    usart_printf("CC voltage: %d mV\r\n", cc_volt);
 }
 
 // poll function to get/set changes in state
@@ -732,12 +738,15 @@ static void poll(void)
             usart_printf("CC line on CC%d\r\n", cc_n);
             fusb_get_status();
         } else {
-            usart_printf("Dettach detected\r\n");
-            // set default state
-            state.attached = 0;
-            state.cc_polarity = 0;
-            state.vconn_enabled = 0;
-            fusb_pd_reset();
+            int still_attached = fusb_check_cc_voltage();
+            if (!still_attached) {
+                usart_printf("Dettach detected\r\n");
+                // set default state
+                state.attached = 0;
+                state.cc_polarity = 0;
+                state.vconn_enabled = 0;
+                fusb_pd_reset();
+            }
         }
     }
 }
