@@ -68,6 +68,7 @@
  * MEASURE (0x04)
  * ----------------------------------------------------------- */
 #define FUSB302_MEAS_VBUS           (1 << 6)
+#define FUSB302_MEAS_MDAC_MASK      0x3F
 #define FUSB302_MEAS_MDAC_MV(mv)    (((mv)/42) & 0x3F) // MDAC step = 42mV
 
 /* -----------------------------------------------------------
