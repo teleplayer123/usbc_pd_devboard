@@ -69,6 +69,7 @@
  * ----------------------------------------------------------- */
 #define FUSB302_MEAS_VBUS           (1 << 6)
 #define FUSB302_MEAS_MDAC_MASK      0x3F
+// Convert voltage to MDAC code for programming the fusb302
 #define FUSB302_MEAS_MDAC_MV(mv)    (((mv)/42) & 0x3F) // MDAC step = 42mV
 
 /* -----------------------------------------------------------

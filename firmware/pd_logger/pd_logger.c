@@ -494,7 +494,7 @@ static int fusb_measure_cc_pin_src(uint8_t cc_reg)
     // Set measurement switch
     fusb_write(FUSB302_REG_SWITCHES0, reg);
     // Set MDAC to default value
-    uint8_t mdac = FUSB302_MEAS_MDAC_MV(PD_SRC_DEF_MV);
+    uint8_t mdac = FUSB302_MEAS_MDAC_MV(PD_SRC_DEF_MV); // converts milivolts to MDAC code to write to MEASURE register
     fusb_write(FUSB302_REG_MEASURE, mdac);
     fusb_delay_us(250);
     // Read status register
@@ -653,6 +653,41 @@ static int fusb_get_vbus_voltage(void)
     }
     vbus = (mdac + 1) * 420;
     return vbus;
+}
+
+uint16_t fusb_measure_cc_voltage(bool cc1)
+{
+    uint8_t sw0 = fusb_read(FUSB302_REG_SWITCHES0);
+    uint8_t meas = fusb_read(FUSB302_REG_MEASURE);
+
+    // Disable Rd and select CC pin
+    uint8_t new_sw0 = sw0 & ~(FUSB302_SW0_PDWN1 | FUSB302_SW0_PDWN2);
+    new_sw0 &= ~(FUSB302_SW0_MEAS_CC1 | FUSB302_SW0_MEAS_CC2);
+    new_sw0 |= cc1 ? FUSB302_SW0_MEAS_CC1 : FUSB302_SW0_MEAS_CC2;
+
+    fusb_write(FUSB302_REG_SWITCHES0, new_sw0);
+
+    uint8_t dac;
+    for (dac = 0; dac < 64; dac++) {
+        fusb_write(FUSB302_REG_MEASURE, (meas & ~FUSB302_MEAS_MDAC_MASK) | dac);
+
+        // comparator settle
+        fusb_delay_us(350);
+
+        uint8_t st = fusb_read(FUSB302_REG_STATUS0);
+
+        // COMP = 1 → CC > DAC 
+        if (!(st & FUSB302_STATUS0_COMP))
+            break;
+    }
+
+    // Restore registers
+    fusb_write(FUSB302_REG_MEASURE, meas);
+    fusb_write(FUSB302_REG_SWITCHES0, sw0);
+
+    // Approximate conversion
+    // MDAC ≈ 0.2 V + step * ~25 mV
+    return 200 + dac * 25;
 }
 
 static int fusb_int_vbusok(void)
