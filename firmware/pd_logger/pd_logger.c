@@ -655,6 +655,17 @@ static int fusb_get_vbus_voltage(void)
     return vbus;
 }
 
+static int fusb_int_vbusok(void)
+{
+    // return 1 for vbusok else 0
+    uint8_t reg = fusb_read(FUSB302_REG_INTERRUPT);
+    if (reg & FUSB302_INT_VBUSOK) {
+        return 1;
+    } else {
+        return 0;
+    }
+}
+
 // function to print status info for debugging
 static void fusb_get_status(void)
 {
@@ -666,17 +677,6 @@ static void fusb_get_status(void)
     }
     int vbus_voltage = fusb_get_vbus_voltage();
     usart_printf("VBUS Voltage: %dV\r\n", vbus_voltage);
-}
-
-static int fusb_int_vbusok(void)
-{
-    // return 1 for vbusok else 0
-    uint8_t reg = fusb_read(FUSB302_REG_INTERRUPT);
-    if (reg & FUSB302_INT_VBUSOK) {
-        return 1;
-    } else {
-        return 0;
-    }
 }
 
 // poll function to get/set changes in state
