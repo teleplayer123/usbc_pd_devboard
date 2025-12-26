@@ -655,7 +655,7 @@ static int fusb_get_vbus_voltage(void)
     return vbus;
 }
 
-uint16_t fusb_measure_cc_voltage(bool cc1)
+static int fusb_measure_cc_voltage(bool cc1)
 {
     uint8_t sw0 = fusb_read(FUSB302_REG_SWITCHES0);
     uint8_t meas = fusb_read(FUSB302_REG_MEASURE);
@@ -685,9 +685,8 @@ uint16_t fusb_measure_cc_voltage(bool cc1)
     fusb_write(FUSB302_REG_MEASURE, meas);
     fusb_write(FUSB302_REG_SWITCHES0, sw0);
 
-    // Approximate conversion
-    // MDAC ≈ 0.2 V + step * ~25 mV
-    return 200 + dac * 25;
+    // Approximate conversion to mV
+    return dac * 42;
 }
 
 static int fusb_int_vbusok(void)
@@ -712,6 +711,13 @@ static void fusb_get_status(void)
     }
     int vbus_voltage = fusb_get_vbus_voltage();
     usart_printf("VBUS Voltage: %dV\r\n", vbus_voltage);
+    bool cc1;
+    if (state.cc_polarity)
+        cc1 = false;
+    else
+        cc1 = true;
+    int cc_mvolt = fusb_measure_cc_voltage(cc1);
+    usart_printf("CC voltage: %d mV\r\n", cc_mvolt);
 }
 
 // poll function to get/set changes in state
