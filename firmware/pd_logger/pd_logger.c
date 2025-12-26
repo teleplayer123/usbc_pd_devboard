@@ -738,7 +738,9 @@ static void poll(void)
             usart_printf("CC line on CC%d\r\n", cc_n);
             fusb_get_status();
         } else {
+            // verify device is dettached
             int still_attached = fusb_check_cc_voltage();
+            // if CC voltage is 0, assume device is not attached (some edge cases will be missed)
             if (!still_attached) {
                 usart_printf("Dettach detected\r\n");
                 // set default state
