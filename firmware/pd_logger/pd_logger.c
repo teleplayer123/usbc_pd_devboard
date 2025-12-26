@@ -265,12 +265,6 @@ static void fusb_pd_reset(void)
     fusb_delay_ms(2);
 }
 
-static void fusb_full_reset(void)
-{
-    fusb_write(FUSB302_REG_RESET, FUSB302_RESET_SW | FUSB302_RESET_PD);
-    fusb_delay_ms(2);
-}
-
 static void fusb_power_all(void)
 {
     fusb_write(FUSB302_REG_POWER, FUSB302_POWER_ALL_ON);
@@ -299,6 +293,8 @@ static void fusb_current_state(void)
     usart_printf("---- End State ----\r\n");
 }
 
+/*
+// unused functions being kept as reference for now...
 static void fusb_setup_sniffer(void)
 {    
     uint8_t reg;
@@ -367,6 +363,7 @@ static void fusb_init_sink(void)
 
     usart_printf("FUSB302 initialized in Sink mode.\n");
 }
+*/
 
 static void fusb_setup(void)
 {
@@ -640,7 +637,8 @@ static int fusb_mdac_comp(int mdac)
     return reg & FUSB302_STATUS0_COMP;
 }
 
-static int fusb_get_vbus_voltage(void)
+// Returns voltage on VBUS in mV
+static int fusb_measure_vbus_voltage(void)
 {
     int vbus; 
     int mdac = 0;
@@ -709,8 +707,8 @@ static void fusb_get_status(void)
     if (!fusb_rx_empty()) {
         check_rx_buffer();
     }
-    int vbus_voltage = fusb_get_vbus_voltage();
-    usart_printf("VBUS Voltage: %dV\r\n", vbus_voltage);
+    int vbus_voltage = fusb_measure_vbus_voltage();
+    usart_printf("VBUS Voltage: %d mV\r\n", vbus_voltage);
     bool cc1;
     if (state.cc_polarity)
         cc1 = false;
