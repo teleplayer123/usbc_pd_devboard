@@ -472,7 +472,13 @@ static const struct bit_name fusb302_mask_bits[] = {
 
 static const struct bit_name fusb302_maska_bits[] = {
     {FUSB302_MASKA_OCP_TEMP, "OCP_TEMP"},
-    {}
-}
+    {FUSB302_MASKA_TOGDONE, "TOGDONE"},
+    {FUSB302_MASKA_SOFTFAIL, "SOFTFAIL"},
+    {FUSB302_MASKA_RETRYFAIL, "RETRYFAIL"},
+    {FUSB302_MASKA_HARDSENT, "HARDSENT"},
+    {FUSB302_MASKA_TXSENT, "TXSENT"},
+    {FUSB302_MASKA_SOFTRST, "SOFTRST"},
+    {FUSB302_MASKA_HARDRST, "HARDRST"},
+};
 
 #endif /* FUSB302_H */
