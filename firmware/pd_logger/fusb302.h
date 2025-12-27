@@ -268,7 +268,7 @@
  * PD Macros
  * ----------------------------------------------------------- */
 
- // Maximum size of the RxFIFO in FUSB302 [1]
+// Maximum size of the RxFIFO in FUSB302 [1]
 #define FUSB302_RX_FIFO_SIZE 80
 
 // Maximum length of a standard PD Data Message (Header + 7 PDOs + CRC)
@@ -308,6 +308,7 @@ typedef struct {
 /* -----------------------------------------------------------
  * Tokens for FIFOS register
  * ----------------------------------------------------------- */
+
 enum fusb302_txfifo_tokens {
     FUSB302_TX_TKN_TXON = 0xA1,
     FUSB302_TX_TKN_SOP1 = 0x12,
@@ -332,10 +333,13 @@ enum fusb302_rxfifo_tokens {
 /* -----------------------------------------------------------
  * Register structs for debugging (printing bits)
  * ----------------------------------------------------------- */
+
  struct bit_name {
     int mask;
     const char *name;
 };
+
+/*------------ Status Registers ------------*/
 
 static const struct bit_name fusb302_status0_bits[] = {
     {FUSB302_STATUS0_VBUSOK, "VBUSOK"},
@@ -357,17 +361,6 @@ static const struct bit_name fusb302_status1_bits[] = {
     {FUSB302_STATUS1_TX_FULL, "TX_FULL"},
     {FUSB302_STATUS1_OVRTEMP, "OVRTEMP"},
     {FUSB302_STATUS1_OCP, "OCP"},
-};
-
-static const struct bit_name fusb302_interrupt_bits[] = {
-    {FUSB302_INT_VBUSOK, "I_VBUSOK"},
-    {FUSB302_INT_ACTIVITY, "I_ACTIVITY"},
-    {FUSB302_INT_COMP_CHNG, "I_COMP_CHNG"},
-    {FUSB302_INT_CRC_CHK, "I_CRC_CHK"},
-    {FUSB302_INT_ALERT, "I_ALERT"},
-    {FUSB302_INT_WAKE, "I_WAKE"},
-    {FUSB302_INT_COLLISION, "I_COLLISION"},
-    {FUSB302_INT_BC_LVL, "I_BC_LVL"},
 };
 
 static const struct bit_name fusb302_status0a_bits[] = {
@@ -392,6 +385,19 @@ static const struct bit_name fusb302_status1a_bits[] = {
     {FUSB302_STATUS1A_RXSOP, "RXSOP"},
 };
 
+/*------------ Interrupt Registers ------------*/
+// Note: reading interrupts clears it
+static const struct bit_name fusb302_interrupt_bits[] = {
+    {FUSB302_INT_VBUSOK, "I_VBUSOK"},
+    {FUSB302_INT_ACTIVITY, "I_ACTIVITY"},
+    {FUSB302_INT_COMP_CHNG, "I_COMP_CHNG"},
+    {FUSB302_INT_CRC_CHK, "I_CRC_CHK"},
+    {FUSB302_INT_ALERT, "I_ALERT"},
+    {FUSB302_INT_WAKE, "I_WAKE"},
+    {FUSB302_INT_COLLISION, "I_COLLISION"},
+    {FUSB302_INT_BC_LVL, "I_BC_LVL"},
+};
+
 static const struct bit_name fusb302_interrupta_bits[] = {
     {FUSB302_INTA_OCP_TEMP, "I_OCP_TEMP"},
     {FUSB302_INTA_TOGDONE, "I_TOGDONE"},
@@ -402,6 +408,8 @@ static const struct bit_name fusb302_interrupta_bits[] = {
     {FUSB302_INTA_SOFTRST, "I_SOFTRST"},
     {FUSB302_INTA_HARDRST, "I_HARDRST"},
 };
+
+/*------------ Switches Registers ------------*/
 
 static const struct bit_name fusb302_switches0_bits[] = {
     {FUSB302_SW0_PU_EN2, "PU_EN2"},
@@ -425,6 +433,8 @@ static const struct bit_name fusb302_switches1_bits[] = {
     {FUSB302_SW1_TXCC1, "TXCC1"},
 };
 
+/*------------ Control Registers ------------*/
+
 static const struct bit_name fusb302_control0_bits[] = {
     {BIT(7), NULL},
     {FUSB302_CTL0_TX_FLUSH, "TX_FLUSH"},
@@ -446,5 +456,23 @@ static const struct bit_name fusb302_control3_bits[] = {
     {FUSB302_CTL3_NRETRIES0, "NRETRIES0"},
     {FUSB302_CTL3_AUTO_RETRY, "AUTO_RETRY"},
 };
+
+/*------------ Mask Registers ------------*/
+
+static const struct bit_name fusb302_mask_bits[] = {
+    {FUSB302_MASK_VBUSOK, "VBUSOK"},
+    {FUSB302_MASK_ACTIVITY, "ACTIVITY"},
+    {FUSB302_MASK_COMP_CHNG, "COMP_CHNG"},
+    {FUSB302_MASK_CRC_CHK, "CRC_CHK"},
+    {FUSB302_MASK_ALERT, "ALERT"},
+    {FUSB302_MASK_WAKE, "WAKE"},
+    {FUSB302_MASK_COLLISION, "COLLISION"},
+    {FUSB302_MASK_BC_LVL, "BC_LVL"},
+};
+
+static const struct bit_name fusb302_maska_bits[] = {
+    {FUSB302_MASKA_OCP_TEMP, "OCP_TEMP"},
+    {}
+}
 
 #endif /* FUSB302_H */

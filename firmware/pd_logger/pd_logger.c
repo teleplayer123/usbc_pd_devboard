@@ -329,7 +329,7 @@ static void fusb_setup_sniffer(void)
     fusb_write(FUSB302_REG_MASKA, 0x00);
     fusb_write(FUSB302_REG_MASKB, 0x00);
 
-    // Clear interrupts
+    // Reading interrupts clears them
     fusb_read(FUSB302_REG_INTERRUPT);
     fusb_read(FUSB302_REG_INTERRUPTA);
     fusb_read(FUSB302_REG_INTERRUPTB);
@@ -689,6 +689,7 @@ static int fusb_measure_cc_voltage(bool cc1)
 
 static int fusb_int_vbusok(void)
 {
+    // Note: interrupt is cleared when read
     // return 1 for vbusok else 0
     uint8_t reg = fusb_read(FUSB302_REG_INTERRUPT);
     if (reg & FUSB302_INT_VBUSOK) {
@@ -738,6 +739,7 @@ static void poll(void)
             usart_printf("CC line on CC%d\r\n", cc_n);
             fusb_get_status();
         } else {
+            // reading interrupts clears them, so we need a work around to avoid false positives
             // verify device is dettached
             int still_attached = fusb_check_cc_voltage();
             // if CC voltage is 0, assume device is not attached (some edge cases will be missed)
