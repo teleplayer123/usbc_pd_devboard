@@ -1,0 +1,5 @@
+*.lck
+*auto_saved_files#
+*backups/
+build/
+.vscode/
