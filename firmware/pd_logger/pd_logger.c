@@ -708,7 +708,8 @@ static int fusb_int_vbusok(void)
 static int fusb_check_cc_voltage(void)
 {
     bool cc1;
-    if (state.cc_polarity)
+    int polarity = fusb_check_cc_pin();
+    if (polarity)
         cc1 = false;
     else
         cc1 = true;
@@ -855,6 +856,10 @@ static void fusb_get_status(void)
 static void poll(void)
 {
     int attached = fusb_int_vbusok();
+    int cc_volt = fusb_check_cc_voltage();
+    if (!attached && cc_volt > 0)
+        // account for case where VBUS is pulled to ground with jumper
+        attached = 1;
     if (attached != state.attached) {
         if (attached) {
             state.attached = 1;
