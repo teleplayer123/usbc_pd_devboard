@@ -510,7 +510,6 @@ static void fusb_measure_cc_pin_snk(uint8_t *cc1, uint8_t *cc2)
     bc_lvl_cc1 = fusb_read(FUSB302_REG_STATUS0);
     // Read bc_lvl 
     bc_lvl_cc1 &= (FUSB302_STATUS0_BC_LVL0 | FUSB302_STATUS0_BC_LVL1);
-    usart_printf("CC1 Sink BC_LVL: %02X\r\n", bc_lvl_cc1);
 
     // Measure cc2
     reg = fusb_read(FUSB302_REG_SWITCHES0);
@@ -524,7 +523,6 @@ static void fusb_measure_cc_pin_snk(uint8_t *cc1, uint8_t *cc2)
     bc_lvl_cc2 = fusb_read(FUSB302_REG_STATUS0);
     // Read bc_lvl
     bc_lvl_cc2 &= (FUSB302_STATUS0_BC_LVL0 | FUSB302_STATUS0_BC_LVL1);
-    usart_printf("CC2 Sink BC_LVL: %02X\r\n", bc_lvl_cc2);
 
     *cc1 = convert_bc_lvl(bc_lvl_cc1);
     *cc2 = convert_bc_lvl(bc_lvl_cc2);
