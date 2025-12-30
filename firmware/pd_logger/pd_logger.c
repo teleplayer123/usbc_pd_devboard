@@ -282,6 +282,18 @@ static void fusb_flush_Tx_fifo(void)
     fusb_write(FUSB302_REG_CONTROL0, FUSB302_CTL0_TX_FLUSH);
 }
 
+static void fusb_unmask_all_interrupts(void)
+{
+    // Unmask all interrupts
+    fusb_write(FUSB302_REG_MASK, 0x00);
+    fusb_write(FUSB302_REG_MASKA, 0x00);
+    fusb_write(FUSB302_REG_MASKB, 0x00);
+    // Reading interrupts clears them
+    fusb_read(FUSB302_REG_INTERRUPT);
+    fusb_read(FUSB302_REG_INTERRUPTA);
+    fusb_read(FUSB302_REG_INTERRUPTB);
+}
+
 // Print current state struct values for debugging
 static void fusb_current_state(void)
 {
@@ -304,59 +316,6 @@ static void fusb_current_state(void)
     usart_printf("---- End State ----\r\n");
 }
 
-/*
-// unused functions being kept as reference for now...
-static void fusb_setup_sniffer(void)
-{    
-    uint8_t reg;
-
-    usart_printf("Initializing FUSB302 for PD Sniffing...\n");
-
-    state.mdac_vnc = FUSB302_MEAS_MDAC_MV(PD_SRC_DEF_MV);
-    state.mdac_rd = FUSB302_MEAS_MDAC_MV(PD_SRC_DEF_RD_MV);
-    
-    // Reset the FUSB302
-    fusb_reset();
-
-    // Power on
-    fusb_power_all();
-
-    // Configure Switches0: Enable measurement (passive detection) on CC1 and CC2
-    reg = fusb_read(FUSB302_REG_SWITCHES0);
-    reg |= (FUSB302_SW0_MEAS_CC1 | FUSB302_SW0_MEAS_CC2 | FUSB302_SW0_PDWN1 | FUSB302_SW0_PDWN2);
-    fusb_write(FUSB302_REG_SWITCHES0, reg);
-
-    // Configure Control1: Enable reception of all SOP packets
-    fusb_write(FUSB302_REG_CONTROL1, FUSB302_CTL1_ENSOP1 | FUSB302_CTL1_ENSOP2 | FUSB302_CTL1_ENSOP1DB | FUSB302_CTL1_ENSOP2DB);
-
-    // Enable Auto-CRC, Set sink role
-    fusb_write(FUSB302_REG_SWITCHES1, FUSB302_SW1_AUTO_GCRC | FUSB302_SW1_SPECREV1 | FUSB302_SW1_SPECREV0);
-
-    // Toggle to detect CC and establish UFP (Sink)
-    fusb_write(FUSB302_REG_CONTROL2, FUSB302_CTL2_MODE_UFP | FUSB302_CTL2_WAKE_EN | FUSB302_CTL2_TOGGLE);
-
-    // Unmask all interrupts
-    fusb_write(FUSB302_REG_MASK, 0x00);
-    fusb_write(FUSB302_REG_MASKA, 0x00);
-    fusb_write(FUSB302_REG_MASKB, 0x00);
-
-    // Reading interrupts clears them
-    fusb_read(FUSB302_REG_INTERRUPT);
-    fusb_read(FUSB302_REG_INTERRUPTA);
-    fusb_read(FUSB302_REG_INTERRUPTB);
-    fusb_delay_ms(2);
-
-    // Set VCONN and polarity defaults
-    state.vconn_enabled = 0;
-    state.cc_polarity = 0;
-    // Pull-down enabled
-    state.pulling_up = 0;
-    // RX enabled
-    state.rx_enable = 1;
-
-    usart_printf("FUSB302 configured for PD Sniffing.\n");
-}
-
 static void fusb_init_sink(void)
 {
     // CONTROL1 Enable reception of all SOP packets
@@ -364,17 +323,14 @@ static void fusb_init_sink(void)
 
     // SWITCHES1 Enable Auto-CRC, Set sink role
     fusb_write(FUSB302_REG_SWITCHES1, FUSB302_SW1_AUTO_GCRC | FUSB302_SW1_SPECREV1 | FUSB302_SW1_SPECREV0);
+
     // CONTROL2 Toggle to detect CC and establish UFP (Sink)
     fusb_write(FUSB302_REG_CONTROL2, FUSB302_CTL2_MODE_UFP | FUSB302_CTL2_WAKE_EN | FUSB302_CTL2_TOGGLE);
 
-    // SWITCHES0 Enable measurement (passive detection) on CC1 and CC2
-    uint8_t reg = fusb_read(FUSB302_REG_SWITCHES0);
-    reg |= (FUSB302_SW0_MEAS_CC1 | FUSB302_SW0_MEAS_CC2 | FUSB302_SW0_PDWN1 | FUSB302_SW0_PDWN2);
-    fusb_write(FUSB302_REG_SWITCHES0, reg);
-
+    state.pulling_up = 0; // Sink mode, pulling down
+    
     usart_printf("FUSB302 initialized in Sink mode.\n");
 }
-*/
 
 static void fusb_setup(void)
 {
