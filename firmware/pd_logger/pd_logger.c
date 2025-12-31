@@ -282,12 +282,16 @@ static void fusb_flush_Tx_fifo(void)
     fusb_write(FUSB302_REG_CONTROL0, FUSB302_CTL0_TX_FLUSH);
 }
 
-static void fusb_unmask_all_interrupts(void)
+static void fusb_unmask_interrupts(void)
 {
     // Unmask all interrupts
     fusb_write(FUSB302_REG_MASK, 0x00);
     fusb_write(FUSB302_REG_MASKA, 0x00);
     fusb_write(FUSB302_REG_MASKB, 0x00);
+}
+
+static void fusb_clear_interrupts(void)
+{
     // Reading interrupts clears them
     fusb_read(FUSB302_REG_INTERRUPT);
     fusb_read(FUSB302_REG_INTERRUPTA);
