@@ -1070,8 +1070,6 @@ static void poll(void)
             int cc_n = polarity ? 2 : 1;
             usart_printf("CC line on CC%d\r\n", cc_n);
             fusb_get_status();
-            usart_printf("Enabling RX...\r\n");
-            fusb_rx_enable(true);
         } else {
             // reading interrupts clears them, so we need a work around to avoid false positives
             // verify device is dettached
@@ -1079,8 +1077,6 @@ static void poll(void)
             // if CC voltage is 0, assume device is not attached (some edge cases will be missed)
             if (!still_attached) {
                 usart_printf("Dettach detected\r\n");
-                usart_printf("Disabling RX...\r\n");
-                fusb_rx_enable(false);
                 // set default state
                 state.attached = 0;
                 state.cc_polarity = 0;
