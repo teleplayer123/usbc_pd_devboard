@@ -277,7 +277,7 @@ static void fusb_flush_rx_fifo(void)
     fusb_write(FUSB302_REG_CONTROL1, FUSB302_CTL1_RX_FLUSH);
 }
 
-static void fusb_flush_Tx_fifo(void)
+static void fusb_flush_tx_fifo(void)
 {
     fusb_write(FUSB302_REG_CONTROL0, FUSB302_CTL0_TX_FLUSH);
 }
