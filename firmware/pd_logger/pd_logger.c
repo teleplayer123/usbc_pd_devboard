@@ -312,6 +312,34 @@ static void fusb_sop_prime_disable(void)
     fusb_write(FUSB302_REG_CONTROL1, reg);
 }
 
+static void fusb_sop_prime_db_enable(void)
+{
+    int reg = fusb_read(FUSB302_REG_CONTROL1);
+    reg |= (FUSB302_CTL1_ENSOP1DB | FUSB302_CTL1_ENSOP2DB);
+    fusb_write(FUSB302_REG_CONTROL1, reg);
+}
+
+static void fusb_sop_prime_db_disable(void)
+{
+    int reg = fusb_read(FUSB302_REG_CONTROL1);
+    reg &= ~(FUSB302_CTL1_ENSOP1DB | FUSB302_CTL1_ENSOP2DB);
+    fusb_write(FUSB302_REG_CONTROL1, reg);
+}
+
+static void fusb_set_mdac_vnc(uint8_t mv)
+{
+    uint8_t mdac = FUSB302_MEAS_MDAC_MV(mv);
+    fusb_write(FUSB302_REG_MEASURE, (fusb_read(FUSB302_REG_MEASURE) & ~FUSB302_MEAS_MDAC_MASK) | mdac);
+    state.mdac_vnc = mdac;
+}
+
+static void fusb_set_mdac_rd(uint8_t mv)
+{
+    uint8_t mdac = FUSB302_MEAS_MDAC_MV(mv);
+    fusb_write(FUSB302_REG_MEASURE, (fusb_read(FUSB302_REG_MEASURE) & ~FUSB302_MEAS_MDAC_MASK) | mdac);
+    state.mdac_rd = mdac;
+}
+
 // Print current state struct values for debugging
 static void fusb_current_state(void)
 {
