@@ -657,6 +657,7 @@ static void fusb_enable_gcrc(bool enable)
     } else {
         reg &= ~FUSB302_SW1_AUTO_GCRC;
     }
+    fusb_write(FUSB302_REG_SWITCHES1, reg);
 }
 
 static int fusb_check_cc_pin_snk(void)
@@ -842,6 +843,104 @@ static void fusb_get_status(void)
  * PD Message and Interrupt Handling
  * ------------------------------------------------------------ */
 
+bool read_pd_message(pd_msg_t *pd)
+{
+    uint8_t tok;
+
+    fusb_read_fifo(&tok, 1);
+    if ((tok & 0xE0) != FUSB302_RX_TKN_SOP)
+        return false;
+
+    fusb_read_fifo(&tok, 1);
+    if ((tok & 0xE0) != FUSB302_RX_TKN_PACKSYM)
+        return false;
+
+    uint8_t hdr[2];
+    fusb_read_fifo(hdr, 2);
+    pd->header = hdr[0] | (hdr[1] << 8);
+
+    int nobj = PD_HEADER_NUM_DATA_OBJECTS(pd->header);
+    if (nobj > 7) nobj = 7;
+
+    if (nobj) {
+        fusb_read_fifo(&tok, 1);
+        fusb_read_fifo((uint8_t *)pd->obj, nobj * 4);
+    }
+
+    do {
+        fusb_read_fifo(&tok, 1);
+    } while ((tok & 0xD0) != FUSB302_RX_TKN_EOP);
+
+    return true;
+}
+
+static const char *pd_msg_name(uint8_t type, bool data)
+{
+    if (!data) {
+        switch (type) {
+        case 0:  return "GoodCRC";
+        case 1:  return "GotoMin";
+        case 2:  return "Accept";
+        case 3:  return "Reject";
+        case 6:  return "PS_RDY";
+        case 7:  return "Get_Source_Cap";
+        case 8:  return "Get_Sink_Cap";
+        case 13: return "Soft_Reset";
+        default: return "Ctrl_Unknown";
+        }
+    } else {
+        switch (type) {
+        case 1:  return "Source_Capabilities";
+        case 2:  return "Request";
+        case 4:  return "Sink_Capabilities";
+        case 15: return "Vendor_Defined";
+        default: return "Data_Unknown";
+        }
+    }
+}
+
+static void pd_log_message(pd_msg_t *p)
+{
+    uint8_t type  = PD_HEADER_MESSAGE_TYPE(p->header);
+    uint8_t nobj  = PD_HEADER_NUM_DATA_OBJECTS(p->header);
+    bool data     = (nobj > 0);
+
+    uint8_t msgid = (p->header >> 9) & 0x7;
+    uint8_t prole = (p->header >> 8) & 0x1;
+    uint8_t drole = (p->header >> 5) & 0x1;
+    uint8_t rev   = (p->header >> 6) & 0x3;
+
+    usart_printf(
+        "[%8lu ms] PD RX | %s | ID=%d | %s | %s | Rev=%d | Obj=%d | HDR=0x%04X\r\n",
+        system_millis,
+        pd_msg_name(type, data),
+        msgid,
+        prole ? "SRC" : "SNK",
+        drole ? "DFP" : "UFP",
+        rev,
+        nobj,
+        p->header
+    );
+
+    for (int i = 0; i < nobj; i++) {
+        usart_printf("    OBJ%d: 0x%08lX\r\n", i + 1, p->obj[i]);
+
+        if (type == 1) {
+            int mv = ((p->obj[i] >> 10) & 0x3FF) * 50;
+            int ma = (p->obj[i] & 0x3FF) * 10;
+            usart_printf("        -> %d mV @ %d mA\r\n", mv, ma);
+        }
+
+        if (type == 2) {
+            int pdo = (p->obj[i] >> 28) & 0x7;
+            int ma  = ((p->obj[i] >> 10) & 0x3FF) * 10;
+            int mv  = (p->obj[i] & 0x3FF) * 50;
+            usart_printf("        -> Request PDO%d %d mV %d mA\r\n",
+                          pdo, mv, ma);
+        }
+    }
+}
+
 // static uint8_t rx_buffer[MAX_PD_PACKET_SIZE];
 // void exti4_15_isr(void) {
 //     usart_printf("EXTI interrupt triggered!\r\n");
@@ -971,6 +1070,8 @@ static void poll(void)
             int cc_n = polarity ? 2 : 1;
             usart_printf("CC line on CC%d\r\n", cc_n);
             fusb_get_status();
+            usart_printf("Enabling RX...\r\n");
+            fusb_rx_enable(true);
         } else {
             // reading interrupts clears them, so we need a work around to avoid false positives
             // verify device is dettached
@@ -978,12 +1079,21 @@ static void poll(void)
             // if CC voltage is 0, assume device is not attached (some edge cases will be missed)
             if (!still_attached) {
                 usart_printf("Dettach detected\r\n");
+                usart_printf("Disabling RX...\r\n");
+                fusb_rx_enable(false);
                 // set default state
                 state.attached = 0;
                 state.cc_polarity = 0;
                 state.vconn_enabled = 0;
                 fusb_pd_reset();
             }
+        }
+    }
+
+    if (!fusb_rx_empty()) {
+        pd_msg_t msg;
+        if (read_pd_message(&msg)) {
+            pd_log_message(&msg);
         }
     }
 }
@@ -1058,6 +1168,7 @@ int main(void)
     exti_setup(); 
 
     fusb_setup();
+    fusb_init_sink();
 
     while (1) {
         if (usart_rx_ready()) {
