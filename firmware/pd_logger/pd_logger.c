@@ -228,6 +228,16 @@ static void fusb_read_fifo(uint8_t *buf, int len)
     i2c_transfer7(I2C1, FUSB302_ADDR, &r, 1, buf, len);
 }
 
+static int fusb_xfer(const uint8_t *out, int out_size, uint8_t *in, int in_size)
+{
+    i2c_transfer7(I2C1, FUSB302_ADDR, (uint8_t *)out, out_size, in, in_size);
+    if (I2C_ISR(I2C1) & (I2C_ISR_NACKF | I2C_ISR_BERR | I2C_ISR_ARLO)) {
+        i2c_clear_stop(I2C1);
+        return -1;
+    }
+    return 0;
+}
+
 /* ------------------------------------------------------------
  * FUSB302 functions
  * ------------------------------------------------------------ */
@@ -819,6 +829,24 @@ static int fusb_check_cc_voltage(void)
         cc1 = true;
     int cc_mvolt = fusb_measure_cc_voltage(cc1);
     return cc_mvolt;
+}
+
+static int fusb_get_msg(uint32_t *payload, int *header)
+{
+    uint8_t buf[32];
+    int rv, len;
+
+    if (fusb_rx_empty()) {
+        return -1;
+    }
+
+    // read until fifo empty
+    do {
+        // write register address
+        buf[0] = FUSB302_REG_FIFOS;
+        rv = fusb_xfer(buf, 1, 0, 0);
+        
+    }
 }
 
 // function to print status info for debugging
