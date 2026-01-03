@@ -21,6 +21,8 @@
 #define I2C_TIMEOUT 100000
 
 #define PACKET_IS_GOOD_CRC(head) (PD_HEADER_MESSAGE_TYPE(head) == PD_CTRL_GOOD_CRC && PD_HEADER_NUM_DATA_OBJECTS(head) == 0)
+#define I2C_XFER_START BIT(0)
+#define I2C_XFER_STOP BIT(1)
 
 volatile uint32_t system_millis;
 
@@ -232,85 +234,107 @@ static void fusb_read_fifo(uint8_t *buf, int len)
     i2c_transfer7(I2C1, FUSB302_ADDR, &r, 1, buf, len);
 }
 
-static int i2c_start_write(uint32_t i2c, uint8_t addr, uint8_t len)
+static int i2c_start_write(uint32_t i2c, uint8_t addr, uint8_t nbytes, int flags)
 {
-    uint32_t timeout = I2C_TIMEOUT;
+    uint32_t timeout = 100000;
+    uint32_t cr2 = 0;
 
-    /* Wait until bus not busy */
-    while (I2C_ISR(i2c) & I2C_ISR_BUSY)
-        if (--timeout == 0) return -1;
+    /* Wait for bus free only if START requested */
+    if (flags & I2C_XFER_START) {
+        while (I2C_ISR(i2c) & I2C_ISR_BUSY)
+            if (--timeout == 0)
+                return -1;
+    }
 
-    /* Configure transfer */
-    I2C_CR2(i2c) =
-        (addr << 1) |
-        (len << I2C_CR2_NBYTES_SHIFT) |
-        I2C_CR2_START |
-        I2C_CR2_AUTOEND; /* STOP automatically */
+    cr2 |= (addr << 1);
+    cr2 |= (nbytes << I2C_CR2_NBYTES_SHIFT);
 
+    if (flags & I2C_XFER_STOP)
+        cr2 |= I2C_CR2_AUTOEND;
+
+    if (flags & I2C_XFER_START)
+        cr2 |= I2C_CR2_START;
+
+    I2C_CR2(i2c) = cr2;
     return 0;
 }
 
-static int i2c_write_byte(uint32_t i2c, uint8_t byte)
+static int i2c_start_read(uint32_t i2c, uint8_t addr, uint8_t nbytes, int flags)
 {
-    uint32_t timeout = I2C_TIMEOUT;
+    uint32_t cr2 = 0;
+
+    cr2 |= (addr << 1);
+    cr2 |= I2C_CR2_RD_WRN;
+    cr2 |= (nbytes << I2C_CR2_NBYTES_SHIFT);
+
+    if (flags & I2C_XFER_STOP)
+        cr2 |= I2C_CR2_AUTOEND;
+
+    if (flags & I2C_XFER_START)
+        cr2 |= I2C_CR2_START;
+
+    I2C_CR2(i2c) = cr2;
+    return 0;
+}
+
+static int i2c_write_byte(uint32_t i2c, uint8_t val)
+{
+    uint32_t timeout = 100000;
 
     while (!(I2C_ISR(i2c) & I2C_ISR_TXIS))
-        if (--timeout == 0) return -1;
+        if (--timeout == 0)
+            return -1;
 
-    I2C_TXDR(i2c) = byte;
+    I2C_TXDR(i2c) = val;
     return 0;
 }
 
-static int i2c_restart_read(uint32_t i2c, uint8_t addr, uint8_t len)
+static int i2c_read_byte(uint32_t i2c, uint8_t *val)
 {
-    uint32_t timeout = I2C_TIMEOUT;
-
-    /* Configure read transfer */
-    I2C_CR2(i2c) =
-        (addr << 1) |
-        I2C_CR2_RD_WRN |
-        (len << I2C_CR2_NBYTES_SHIFT) |
-        I2C_CR2_START |
-        I2C_CR2_AUTOEND;
-
-    return 0;
-}
-
-static int i2c_read_byte(uint32_t i2c, uint8_t *byte)
-{
-    uint32_t timeout = I2C_TIMEOUT;
+    uint32_t timeout = 100000;
 
     while (!(I2C_ISR(i2c) & I2C_ISR_RXNE))
-        if (--timeout == 0) return -1;
+        if (--timeout == 0)
+            return -1;
 
-    *byte = I2C_RXDR(i2c);
+    *val = I2C_RXDR(i2c);
     return 0;
 }
 
-int fusb302_read_reg_ll(uint8_t reg, uint8_t *val)
+// static int fusb_xfer(const uint8_t *out, int out_size, uint8_t *in, int in_size)
+// {
+//     i2c_transfer7(I2C1, FUSB302_ADDR, (uint8_t *)out, out_size, in, in_size);
+//     if (I2C_ISR(I2C1) & (I2C_ISR_NACKF | I2C_ISR_BERR | I2C_ISR_ARLO)) {
+//         i2c_clear_stop(I2C1);
+//         return -1;
+//     }
+//     return 0;
+// }
+
+static int fusb_xfer(const uint8_t *out, int out_size, uint8_t *in, int in_size, int flags)
 {
-    if (i2c_start_write(I2C1, FUSB302_ADDR, 1))
-        return -1;
+    int i;
 
-    if (i2c_write_byte(I2C1, reg))
-        return -1;
+    // write phase
+    if (out_size > 0) {
+        if (i2c_start_write(I2C1, FUSB302_ADDR, out_size, flags))
+            return -1;
 
-    if (i2c_restart_read(I2C1, FUSB302_ADDR, 1))
-        return -1;
-
-    if (i2c_read_byte(I2C1, val))
-        return -1;
-
-    return 0;
-}
-
-static int fusb_xfer(const uint8_t *out, int out_size, uint8_t *in, int in_size)
-{
-    i2c_transfer7(I2C1, FUSB302_ADDR, (uint8_t *)out, out_size, in, in_size);
-    if (I2C_ISR(I2C1) & (I2C_ISR_NACKF | I2C_ISR_BERR | I2C_ISR_ARLO)) {
-        i2c_clear_stop(I2C1);
-        return -1;
+        for (i = 0; i < out_size; i++)
+            if (i2c_write_byte(I2C1, out[i]))
+                return -1;
     }
+
+    // read phase
+    if (in_size > 0) {
+        if (i2c_start_read(I2C1, FUSB302_ADDR, in_size, flags))
+            return -1;
+
+        for (i = 0; i < in_size; i++)
+            if (i2c_read_byte(I2C1, &in[i]))
+                return -1;
+    }
+
     return 0;
 }
 
@@ -924,49 +948,73 @@ static int get_num_bytes(uint16_t header)
 	return rv;
 }
 
-int fusb302_tcpm_get_message(uint32_t *payload, int *head)
+static int fusb_get_message(uint32_t *payload, int *head)
 {
     uint8_t buf[32];
+    uint8_t fifo_reg = FUSB302_REG_FIFOS;
+    int rv;
     int len;
-    int i;
 
-    /* FIFO empty? Nothing to do */
+    /* Nothing to read */
     if (fusb_rx_empty())
         return -1;
 
     do {
-        /* START + WRITE FIFO register address */
-        if (i2c_start_write(I2C1, FUSB302_ADDR, 1))
-            return -1;
+        /*
+         * STEP 1: Point FIFO read pointer
+         * START, no STOP
+         */
+        rv = fusb_xfer(&fifo_reg, 1,
+                       NULL, 0,
+                       I2C_XFER_START);
+        if (rv)
+            return rv;
 
-        if (i2c_write_byte(I2C1, FUSB302_REG_FIFOS))
-            return -1;
+        /*
+         * STEP 2: Read token + PD header (3 bytes total)
+         * RESTART, no STOP
+         */
+        rv = fusb_xfer(NULL, 0,
+                       buf, 3,
+                       I2C_XFER_START);
+        if (rv)
+            return rv;
 
-        /* RESTART + READ token + header (3 bytes) */
-        if (i2c_restart_read(I2C1, FUSB302_ADDR, 3))
+        /* Validate RX token */
+        if (buf[0] != FUSB302_RX_TKN_SOP) {
+            /*
+             * Unsupported packet type (GoodCRC, SOP', JAMCRC, etc)
+             * Flush RX FIFO to recover cleanly
+             */
+            fusb302_rx_flush();
             return -1;
-
-        for (i = 0; i < 3; i++)
-            if (i2c_read_byte(I2C1, &buf[i]))
-                return -1;
+        }
 
         /* Parse PD header */
         *head  = buf[1];
         *head |= ((uint16_t)buf[2] << 8);
 
-        /* Payload length = total bytes − header */
+        /* Determine payload length (bytes, excluding header) */
         len = get_num_bytes(*head) - 2;
-
-        /* Continue reading payload + CRC (no STOP yet) */
-        if (i2c_restart_read(I2C1, FUSB302_ADDR, len + 4))
+        if (len < 0 || len > 28) {
+            fusb302_rx_flush();
             return -1;
+        }
 
-        for (i = 0; i < len + 4; i++)
-            if (i2c_read_byte(I2C1, &buf[i]))
-                return -1;
+        /*
+         * STEP 3: Read payload + CRC
+         * RESTART + STOP
+         */
+        rv = fusb_xfer(NULL, 0,
+                       buf, len + 4,
+                       I2C_XFER_STOP);
+        if (rv)
+            return rv;
 
-        /* STOP happens automatically via AUTOEND */
-
+        /*
+         * Loop again if this was a GoodCRC
+         * and FIFO still contains more packets
+         */
     } while (PACKET_IS_GOOD_CRC(*head) &&
              !fusb_rx_empty());
 
@@ -974,6 +1022,7 @@ int fusb302_tcpm_get_message(uint32_t *payload, int *head)
     if (PACKET_IS_GOOD_CRC(*head))
         return -1;
 
+    /* Copy payload only (exclude CRC) */
     memcpy(payload, buf, len);
     return 0;
 }
