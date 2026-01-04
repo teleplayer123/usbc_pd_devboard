@@ -1070,9 +1070,6 @@ static void fusb_get_status(void)
     fusb_check_mask_regs();
     usart_printf("INT pin=%02X\r\n", gpio_get(GPIOB, GPIO8) ? 1 : 0);
     fusb_current_state();
-    // if (!fusb_rx_empty()) {
-    //     check_rx_buffer();
-    // }
     int vbus_voltage = fusb_measure_vbus_voltage();
     usart_printf("VBUS Voltage: %d mV\r\n", vbus_voltage);
     int cc_volt = fusb_check_cc_voltage();
