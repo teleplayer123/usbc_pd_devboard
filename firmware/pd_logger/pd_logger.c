@@ -40,6 +40,13 @@ static struct fusb302_chip_state {
     int attached;
 } state;
 
+static struct pd_rx_messages {
+    uint16_t head;
+    uint32_t payload[7];
+} rx_messages[50];
+
+int rx_messages_idx = 0;
+
 /* ------------------------------------------------------------
  * MCU Setup Functions
  * ------------------------------------------------------------ */
@@ -342,7 +349,7 @@ static int fusb_xfer(const uint8_t *out, int out_size, uint8_t *in, int in_size,
  * FUSB302 functions
  * ------------------------------------------------------------ */
 
-static bool fusb_rx_empty(void) 
+static uint8_t fusb_rx_empty(void) 
 {
     return fusb_read(FUSB302_REG_STATUS1) & FUSB302_STATUS1_RX_EMPTY;
 }
@@ -948,7 +955,7 @@ static int get_num_bytes(uint16_t header)
 	return rv;
 }
 
-static int fusb_get_message(uint32_t *payload, int *head)
+static int fusb_get_message(uint32_t *payload, uint16_t *head)
 {
     uint8_t buf[32];
     uint8_t fifo_reg = FUSB302_REG_FIFOS;
@@ -986,7 +993,7 @@ static int fusb_get_message(uint32_t *payload, int *head)
              * Unsupported packet type (GoodCRC, SOP', JAMCRC, etc)
              * Flush RX FIFO to recover cleanly
              */
-            fusb302_rx_flush();
+            fusb_flush_rx_fifo();
             return -1;
         }
 
@@ -997,7 +1004,7 @@ static int fusb_get_message(uint32_t *payload, int *head)
         /* Determine payload length (bytes, excluding header) */
         len = get_num_bytes(*head) - 2;
         if (len < 0 || len > 28) {
-            fusb302_rx_flush();
+            fusb_flush_rx_fifo();
             return -1;
         }
 
@@ -1027,6 +1034,33 @@ static int fusb_get_message(uint32_t *payload, int *head)
     return 0;
 }
 
+static void check_rx_messages(void)
+{
+    uint16_t head;
+    uint32_t payload[7];
+    if (rx_messages_idx >= 50) {
+        // reach limit, reset index
+        rx_messages_idx = 0;
+    }
+    if (fusb_get_message(payload, &head) == 0) {
+        rx_messages[rx_messages_idx].head = head;
+        for (int i = 0; i < 7; i++) {
+            rx_messages[rx_messages_idx].payload[i] = payload[i];
+        }
+        rx_messages_idx += 1;
+    }
+}
+
+static void dump_rx_messages(void)
+{
+    for (int i = 0; i <= rx_messages_idx; i++) {
+        usart_printf("---- RX Message %d ----\r\n", i);
+        usart_printf("Header=0x%04X\r\n", rx_messages[i].head);
+        usart_printf("Payload: 0x%08X\r\n", rx_messages[i].payload);
+        usart_printf("-----------------------\r\n");
+    }
+}
+
 // function to print status info for debugging
 static void fusb_get_status(void)
 {
@@ -1036,9 +1070,9 @@ static void fusb_get_status(void)
     fusb_check_mask_regs();
     usart_printf("INT pin=%02X\r\n", gpio_get(GPIOB, GPIO8) ? 1 : 0);
     fusb_current_state();
-    if (!fusb_rx_empty()) {
-        check_rx_buffer();
-    }
+    // if (!fusb_rx_empty()) {
+    //     check_rx_buffer();
+    // }
     int vbus_voltage = fusb_measure_vbus_voltage();
     usart_printf("VBUS Voltage: %d mV\r\n", vbus_voltage);
     int cc_volt = fusb_check_cc_voltage();
@@ -1218,11 +1252,13 @@ static int handle_command(char *line) {
     } else if (line[0] == 's') {
         fusb_get_status();
         check_rx_buffer();
+    } else if (line[0] == 'c') {
+        dump_rx_messages();
     } else if (line[0] == 'q') {
         // return 1 to tell debug_cli to break loop and return to logging
         return 1;
     } else {
-        usart_printf("Commands:\r\n  Read from register:\t\tr <reg>\r\n  Write to register:\t\tw <reg> <val>\r\n  Read bits in register:\tt <reg> \r\n  Status:\t\t\ts \r\n  Quit:\t\t\t\tq  \r\n");
+        usart_printf("Commands:\r\n  Read from register:\t\tr <reg>\r\n  Write to register:\t\tw <reg> <val>\r\n  Read bits in register:\tt <reg> \r\n  Status:\t\t\ts \r\n  Check rx messages:\t\tc  \r\n  Quit:\t\t\t\tq  \r\n");
     }
     return 0;
 }
@@ -1273,6 +1309,10 @@ int main(void)
                 usart_printf("Logging paused. Entering debug menu...\r\n");
                 debug_cli();
             } 
+        }
+        if (!fusb_rx_empty()) {
+            check_rx_messages();
+            dump_rx_messages();
         }
         poll();
         fusb_delay_ms(1000);
