@@ -39,14 +39,14 @@
 #define PD_ROLE_SINK    0
 #define PD_ROLE_SOURCE  1
 
-/* Control Message type - USB-PD Spec Rev 3.0, Ver 1.1, Table 6-5 */
+/* Control Message type - USB-PD Spec Rev 3.2, Ver 1.1, Table 6-5 */
 enum pd_ctrl_msg_type {
-	PD_CTRL_INVALID = 0, /* 0 Reserved - DO NOT PUT IN MESSAGES */
+	PD_CTRL_INVALID = 0, // 0 Reserved - DO NOT PUT IN MESSAGES
 	PD_CTRL_GOOD_CRC = 1,
-	PD_CTRL_GOTO_MIN = 2,
+	PD_CTRL_GOTO_MIN = 2, // Deprecated
 	PD_CTRL_ACCEPT = 3,
 	PD_CTRL_REJECT = 4,
-	PD_CTRL_PING = 5,
+	PD_CTRL_PING = 5,	// Deprecated
 	PD_CTRL_PS_RDY = 6,
 	PD_CTRL_GET_SOURCE_CAP = 7,
 	PD_CTRL_GET_SINK_CAP = 8,
@@ -69,6 +69,25 @@ enum pd_ctrl_msg_type {
 	PD_CTRL_GET_SOURCE_INFO = 23,
 	PD_CTRL_GET_REVISION = 24,
 	/* 25-31 Reserved */
+};
+
+enum pd_data_msg_type {
+	PD_DATA_INVALID = 0, /* 0 Reserved - DO NOT PUT IN MESSAGES */
+	PD_DATA_SOURCE_CAPABILITIES = 1,
+	PD_DATA_REQUEST = 2,
+	PD_DATA_BIST = 3,
+	PD_DATA_SINK_CAPABILITIES = 4,
+	PD_DATA_BATTERY_STATUS = 5,
+	PD_DATA_ALERT = 6,
+	PD_DATA_GET_COUNTRY_INFO = 7,
+	PD_DATA_ENTER_USB = 8,
+	PD_DATA_EPR_REQUEST = 9,
+	PD_DATA_EPR_MODE = 10,
+	PD_DATA_SOURCE_INFO = 11,
+	PD_DATA_REVISION = 12,
+	/* 13-14 Reserved */
+	PD_DATA_VENDOR_DEFINED = 15,
+	/* 16-31 Reserved */
 };
 
 enum tcpc_cc_voltage_status {
