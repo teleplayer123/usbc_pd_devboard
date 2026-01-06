@@ -8,7 +8,17 @@
 // Maximum length of a standard PD Data Message (Header + 7 PDOs + CRC)
 #define MAX_PD_PACKET_SIZE (2 + 7*4 + 4) // Header + 7 Data Objects + CRC = 34 bytes
 
-// Build PD Header from its components
+/*
+* @brief Construct a PD message header
+* @param type: 5 bit Message Type 										   			   			[Bit 4:0]	
+* @param prole: 1 bit Port Power Role (0 = Sink, 1 = Source)		   				   			[Bit 8]	
+* @param drole: 1 bit Device Role (0 = UFP, 1 = DFP)							       			[Bit 5]
+* @param id: 3 bit Message ID initialized to 0 at power on as result of SoftReset or HardReset  [Bit 11:9]	
+*			 ID is incremented by 1 when message successfully received indicated by GoodCRC
+* @param cnt: 3 bit Number of Data Objects (0-7)									   			[Bit 14:12]
+* @param rev: 2 bit Specification Revision											   			[Bit 7:6]
+* @param ext: 1 bit Extended Message Indicator (0 = Control Message, 1 = Data Message) 			[Bit 15]
+*/
 #define PD_HEADER(type, prole, drole, id, cnt, rev, ext) \
 	((type) | ((rev) << 6) | \
 	((drole) << 5) | ((prole) << 8) | \
@@ -24,6 +34,10 @@
 #define PD_SRC_DEF_MV               1600
 #define PD_SRC_DEF_RD_MV            200
 #define PD_RETRY_COUNT              3
+
+// Port Power Role
+#define PD_ROLE_SINK    0
+#define PD_ROLE_SOURCE  1
 
 /* Control Message type - USB-PD Spec Rev 3.0, Ver 1.1, Table 6-5 */
 enum pd_ctrl_msg_type {

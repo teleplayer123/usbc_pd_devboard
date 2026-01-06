@@ -1356,11 +1356,36 @@ static int handle_command(char *line) {
         check_rx_buffer();
     } else if (line[0] == 'c') {
         dump_rx_messages();
+    } else if (line[0] == 'x') {
+        char *p = strtok(&line[1], " ");
+        if (!p) { usart_printf("usage: x <type> <prole> <drole> <id> <cnt> <rev> <ext>\r\n"); return 0; }
+        uint8_t type = (uint8_t)strtol(p, NULL, 0);
+        p = strtok(NULL, " ");
+        if (!p) { usart_printf("usage: x <type> <prole> <drole> <id> <cnt> <rev> <ext>\r\n"); return 0; }
+        uint8_t prole = (uint8_t)strtol(p, NULL, 0);
+        p = strtok(NULL, " ");
+        if (!p) { usart_printf("usage: x <type> <prole> <drole> <id> <cnt> <rev> <ext>\r\n"); return 0; }
+        uint8_t drole = (uint8_t)strtol(p, NULL, 0);
+        p = strtok(NULL, " ");
+        if (!p) { usart_printf("usage: x <type> <prole> <drole> <id> <cnt> <rev> <ext>\r\n"); return 0; }
+        uint8_t id = (uint8_t)strtol(p, NULL, 0);
+        p = strtok(NULL, " ");
+        if (!p) { usart_printf("usage: x <type> <prole> <drole> <id> <cnt> <rev> <ext>\r\n"); return 0; }
+        uint8_t cnt = (uint8_t)strtol(p, NULL, 0);
+        p = strtok(NULL, " ");
+        if (!p) { usart_printf("usage: x <type> <prole> <drole> <id> <cnt> <rev> <ext>\r\n"); return 0; }
+        uint8_t rev = (uint8_t)strtol(p, NULL, 0);
+        p = strtok(NULL, " ");
+        if (!p) { usart_printf("usage: x <type> <prole> <drole> <id> <cnt> <rev> <ext>\r\n"); return 0; }
+        uint8_t ext = (uint8_t)strtol(p, NULL, 0);
+        uint16_t header = PD_HEADER(type, prole, drole, id, cnt, rev, ext);
+        usart_printf("Sending message with header: 0x%04X\r\n", header);
+        fusb_transmit(TYPEC_MESSAGE_TYPE_SOP, header, NULL);
     } else if (line[0] == 'q') {
         // return 1 to tell debug_cli to break loop and return to logging
         return 1;
     } else {
-        usart_printf("Commands:\r\n  Read from register:\t\tr <reg>\r\n  Write to register:\t\tw <reg> <val>\r\n  Read bits in register:\tt <reg> \r\n  Status:\t\t\ts \r\n  Check rx messages:\t\tc  \r\n  Quit:\t\t\t\tq  \r\n");
+        usart_printf("Commands:\r\n  Read from register:\t\tr <reg>\r\n  Write to register:\t\tw <reg> <val>\r\n  Read bits in register:\tt <reg> \r\n  Status:\t\t\ts \r\n  Check rx messages:\t\tc  \r\n  Send SOP message:\t\tx <type> <prole> <drole> <id> <cnt> <rev> <ext>  \r\n  Quit:\t\t\t\tq  \r\n");
     }
     return 0;
 }
