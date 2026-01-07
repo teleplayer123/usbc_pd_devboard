@@ -36,8 +36,12 @@
 #define PD_RETRY_COUNT              3
 
 // Port Power Role
-#define PD_ROLE_SINK    0
-#define PD_ROLE_SOURCE  1
+#define PD_POWER_ROLE_SINK    0
+#define PD_POWER_ROLE_SOURCE  1
+
+// Port Data Role
+#define PD_DATA_ROLE_UFP 0
+#define PD_DATA_ROLE_DFP 1
 
 /* Control Message type - USB-PD Spec Rev 3.2, Ver 1.1, Table 6-5 */
 enum pd_ctrl_msg_type {
