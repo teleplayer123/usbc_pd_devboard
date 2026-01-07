@@ -429,7 +429,7 @@ static const struct bit_name fusb302_control2_bits[] = {
 
 static const struct bit_name fusb302_control3_bits[] = {
     {BIT(7), NULL},
-    {FUSB302_CTL3_SEND_HARD_RESET, "SEND_HARD_RESET"},
+    {FUSB302_CTL3_SEND_HARDRESET, "SEND_HARDRESET"},
     {FUSB302_CTL3_BIST_TMODE, "BIST_TMODE"},
     {FUSB302_CTL3_AUTO_HARDRESET, "AUTO_HARDRESET"},
     {FUSB302_CTL3_AUTO_SOFTRESET, "AUTO_SOFTRESET"},
