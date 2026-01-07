@@ -1384,7 +1384,7 @@ static int handle_command(char *line) {
         // return 1 to tell debug_cli to break loop and return to logging
         return 1;
     } else {
-        usart_printf("Commands:\r\n  Read from register:\t\tr <reg>\r\n  Write to register:\t\tw <reg> <val>\r\n  Read bits in register:\tt <reg> \r\n  Status:\t\t\ts \r\n  Check Rx messages:\t\tc  \r\n  Send SOP message:\t\tx <type> <prole> <drole> <id> <cnt> <rev> <ext>  \r\n  Enable Rx:\t\t\te  \r\n  Disable Rx:\t\t\td  \r\nQuit:\t\t\t\tq  \r\n");
+        usart_printf("Commands:\r\n  Read from register:\t\tr <reg>\r\n  Write to register:\t\tw <reg> <val>\r\n  Read bits in register:\tt <reg> \r\n  Status:\t\t\ts \r\n  Check Rx messages:\t\tc  \r\n  Send SOP message:\t\tx <type> <prole> <drole> <id> <cnt> <rev> <ext>  \r\n  Enable Rx:\t\t\te  \r\n  Disable Rx:\t\t\td  \r\n  Quit:\t\t\t\tq  \r\n");
     }
     return 0;
 }
