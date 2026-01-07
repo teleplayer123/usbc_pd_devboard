@@ -60,7 +60,7 @@
 #define FUSB302_SW1_SPECREV1        (1 << 6)
 #define FUSB302_SW1_SPECREV0        (1 << 5)
 #define FUSB302_SW1_DATAROLE        (1 << 4)
-#define FUSB302_SW1_AUTO_GCRC        (1 << 2)
+#define FUSB302_SW1_AUTO_GCRC       (1 << 2)
 #define FUSB302_SW1_TXCC2           (1 << 1)
 #define FUSB302_SW1_TXCC1           (1 << 0)
 
