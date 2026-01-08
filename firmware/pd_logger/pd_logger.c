@@ -41,6 +41,18 @@ static struct fusb302_chip_state {
     int attached;
 } state;
 
+// Struct to track PD communication state
+static struct pd_protocol {
+    // 3 bit rolling message id counter
+    uint8_t msg_id;
+    // power role (0 = sink, 1 = source)
+    uint8_t power_role;
+    // data role (0 = UFP, 1 = DFP)
+    uint8_t data_role;
+    // revision (0 = Rev 1.0, 1 = Rev 2.0, 2 = Rev 3.0)
+    uint8_t rev;
+} pd;
+
 static struct pd_rx_messages {
     uint16_t head;
     uint32_t payload[7];
