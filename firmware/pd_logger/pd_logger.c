@@ -469,6 +469,21 @@ static void fusb_set_rp_default(void)
     fusb_write(FUSB302_REG_CONTROL0, reg);
 }
 
+static void fusb_set_msg_header(uint8_t prole, uint8_t drole)
+{
+    uint8_t reg;
+    reg = fusb_read(FUSB302_REG_SWITCHES1);
+    reg &= ~(FUSB302_SW1_POWERROLE | FUSB302_SW1_DATAROLE);
+    // Set power role
+    if (prole)
+        reg |= FUSB302_SW1_POWERROLE;
+    // Set data role
+    if (drole)
+        reg |= FUSB302_SW1_DATAROLE;
+
+    fusb_write(FUSB302_REG_SWITCHES1, reg);
+}
+
 // Print current state struct values for debugging
 static void fusb_current_state(void)
 {
