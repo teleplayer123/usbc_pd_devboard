@@ -1526,9 +1526,13 @@ int main(void)
                 usart_printf("Logging paused. Entering debug menu...\r\n");
                 debug_cli();
             } 
-        }
-        check_rx_messages();    
+        }    
         poll();
+
+        if (state.attached) {
+            check_rx_messages();
+        }
+        
         fusb_delay_ms(1000);
     }
 }
