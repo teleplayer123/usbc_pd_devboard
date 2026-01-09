@@ -1484,11 +1484,6 @@ int main(void)
         poll();
 
         if (state.attached) {
-            if (!state.tx_sent) {
-                // for testing, send sink capabilities after attach
-                pd_send_snk_caps();
-                state.tx_sent = 1;
-            }
             check_rx_messages();
         }
         // small delay to avoid busy looping
