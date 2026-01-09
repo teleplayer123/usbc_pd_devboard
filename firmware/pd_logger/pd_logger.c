@@ -1401,6 +1401,10 @@ static void poll(void)
             fusb_set_polarity(state.cc_polarity);
             // enable rx
             fusb_rx_enable(true);
+            if (state.pulling_up)
+                fusb_set_msg_header(PD_POWER_ROLE_SOURCE, PD_DATA_ROLE_DFP);
+            else
+                fusb_set_msg_header(PD_POWER_ROLE_SINK, PD_DATA_ROLE_UFP);
             fusb_pd_reset();
             fusb_get_status(false);
         } else {
