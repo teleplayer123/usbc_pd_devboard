@@ -1290,6 +1290,16 @@ static void pd_init_snk(void)
     state.pulling_up = 0;
 }
 
+static void fusb_set_state_default(void)
+{
+    // Set state defaults
+    state.vconn_enabled = 0;
+    state.cc_polarity = 0;
+    state.attached = 0;
+    state.tx_sent = 0;
+    state.pulling_up = 0;
+}
+
 /* ------------------------------------------------------------
  * Main Program Functions
  * ------------------------------------------------------------ */
@@ -1459,6 +1469,7 @@ int main(void)
     exti_setup(); 
 
     // fusb_setup();
+    fusb_set_state_default();
 
     while (1) {
         if (usart_rx_ready()) {
