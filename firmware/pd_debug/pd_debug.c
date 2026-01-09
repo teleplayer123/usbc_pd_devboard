@@ -1469,7 +1469,6 @@ int main(void)
     exti_setup(); 
 
     // fusb_setup();
-    fusb_set_state_default();
 
     while (1) {
         if (usart_rx_ready()) {
@@ -1479,7 +1478,7 @@ int main(void)
                 debug_cli();
             } 
         }
-        poll();
+        // poll();
 
         // small delay to avoid busy looping
         fusb_delay_ms(500);
