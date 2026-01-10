@@ -1286,7 +1286,6 @@ static void pd_init_snk(void)
     pd.data_role = PD_DATA_ROLE_UFP;
     pd.rev = PD_SPEC_REV3;
     pd.msg_id = 0;
-    fusb_rx_enable(false);
     state.pulling_up = 0;
 }
 
@@ -1330,6 +1329,21 @@ static void pd_send_snk_caps(void)
     fusb_transmit(TYPEC_MESSAGE_TYPE_SOP, header, snk_pdo);
     usart_printf("Sent Source Capabilities with header: 0x%04X\r\n", header);
     pd.msg_id++;
+}
+
+static void pd_send_caps(void)
+{
+    if (!state.tx_sent) {
+        if (state.pulling_up) {
+            fusb_set_msg_header(PD_POWER_ROLE_SOURCE, PD_DATA_ROLE_DFP);
+            pd_send_src_caps();
+            state.tx_sent = 1;
+        } else {
+            fusb_set_msg_header(PD_POWER_ROLE_SINK, PD_DATA_ROLE_UFP);
+            pd_send_snk_caps();
+            state.tx_sent = 1;
+        }
+    }
 }
 
 // poll function to get/set changes in state
@@ -1416,17 +1430,15 @@ static int handle_command(char *line) {
         uint16_t header = PD_HEADER(type, prole, drole, id, cnt, rev, ext);
         usart_printf("Sending message with header: 0x%04X\r\n", header);
         fusb_transmit(TYPEC_MESSAGE_TYPE_SOP, header, NULL);
-    } else if (line[0] == 'e') {
-        fusb_rx_enable(true);
-        usart_printf("RX Enabled\r\n");
-    } else if (line[0] == 'd') {
-        fusb_rx_enable(false);
-        usart_printf("RX Disabled\r\n");
+    } else if (line[0] == 'b') {
+        check_rx_buffer();
+    } else if (line[0] == 'p') {
+        pd_send_caps();
     } else if (line[0] == 'q') {
         // return 1 to tell debug_cli to break loop and return to logging
         return 1;
     } else {
-        usart_printf("Commands:\r\n  Read from register:\t\tr <reg>\r\n  Write to register:\t\tw <reg> <val>\r\n  Read bits in register:\tt <reg> \r\n  Status:\t\t\ts \r\n  Check Rx messages:\t\tc  \r\n  Send SOP message:\t\tx <type> <prole> <drole> <id> <cnt> <rev> <ext>  \r\n  Enable Rx:\t\t\te  \r\n  Disable Rx:\t\t\td  \r\n  Quit:\t\t\t\tq  \r\n");
+        usart_printf("Commands:\r\n  Read from register:\t\tr <reg>\r\n  Write to register:\t\tw <reg> <val>\r\n  Read bits in register:\tt <reg> \r\n  Status:\t\t\ts \r\n  Check Rx messages:\t\tc  \r\n  Send SOP message:\t\tx <type> <prole> <drole> <id> <cnt> <rev> <ext>  \r\n  Read FIFO:\t\t\tb  \r\n  Send capabilities:\t\t\tp  \r\n  Quit:\t\t\t\tq  \r\n");
     }
     return 0;
 }
@@ -1468,7 +1480,8 @@ int main(void)
     i2c_setup();
     exti_setup(); 
 
-    // fusb_setup();
+    fusb_setup();
+    pd_init_snk();
 
     while (1) {
         if (usart_rx_ready()) {

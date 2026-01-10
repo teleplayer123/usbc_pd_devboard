@@ -1273,7 +1273,7 @@ static void pd_init_src(void)
 {
     pd.power_role = PD_POWER_ROLE_SOURCE;
     pd.data_role = PD_DATA_ROLE_DFP;
-    pd.rev = PD_SPEC_REV3;
+    pd.rev = PD_SPEC_REV2;
     pd.msg_id = 0;
     fusb_rx_enable(false);
     fusb_set_rp_default();
@@ -1285,7 +1285,7 @@ static void pd_init_snk(void)
 {
     pd.power_role = PD_POWER_ROLE_SINK;
     pd.data_role = PD_DATA_ROLE_UFP;
-    pd.rev = PD_SPEC_REV3;
+    pd.rev = PD_SPEC_REV2;
     pd.msg_id = 0;
     state.pulling_up = 0;
     state.rx_enable = 0;
