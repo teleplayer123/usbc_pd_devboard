@@ -917,6 +917,10 @@ static void fusb_rx_enable(bool enable)
         reg &= ~FUSB302_MASK_BC_LVL;
         fusb_write(FUSB302_REG_MASK, reg);
     }
+    // enable sop' and sop" reception
+    fusb_sop_prime_enable(enable);
+    fusb_sop_prime_db_enable(enable);
+
     fusb_enable_gcrc(enable);
 }
 
@@ -1281,10 +1285,6 @@ static void fusb_setup(void)
     state.tx_sent = 0;
     state.pulling_up = 0;
 
-    // enable sop' and sop" reception
-    fusb_sop_prime_enable(true);
-    fusb_sop_prime_db_enable(true);
-
     // Power all
     fusb_power_all();
 }
@@ -1519,6 +1519,6 @@ int main(void)
         }
 
         // small delay to avoid busy looping
-        fusb_delay_ms(1);
+        fusb_delay_ms(100);
     }
 }
