@@ -1195,18 +1195,20 @@ static void dump_rx_messages(void)
 // function to print status info for debugging
 static void fusb_get_status(bool verbose)
 {
+    usart_printf("[%d] --- Status Update ---\r\n", system_millis);
     if (verbose) {
         fusb_check_status_regs();
         fusb_check_switches_regs();
         fusb_check_control_regs();
         fusb_check_mask_regs();
     }
-    usart_printf("INT pin=%02X\r\n", gpio_get(GPIOB, GPIO8) ? 1 : 0);
+    usart_printf("INT pin=%02X\r\n", system_millis, gpio_get(GPIOB, GPIO8) ? 1 : 0);
     fusb_current_state();
     int vbus_voltage = fusb_measure_vbus_voltage();
     usart_printf("VBUS Voltage: %d mV\r\n", vbus_voltage);
     int cc_volt = fusb_check_cc_voltage();
     usart_printf("CC voltage: %d mV\r\n", cc_volt);
+    usart_printf("[%d] --- End Status Update ---\r\n", system_millis);
 }
 
 static void fusb_setup(void)
@@ -1275,10 +1277,10 @@ static void pd_init_src(void)
     pd.data_role = PD_DATA_ROLE_DFP;
     pd.rev = PD_SPEC_REV2;
     pd.msg_id = 0;
-    fusb_rx_enable(false);
-    fusb_set_rp_default();
     state.pulling_up = 1;
     state.rx_enable = 0;
+    fusb_rx_enable(false);
+    fusb_set_rp_default();
 }
 
 static void pd_init_snk(void)
@@ -1289,6 +1291,7 @@ static void pd_init_snk(void)
     pd.msg_id = 0;
     state.pulling_up = 0;
     state.rx_enable = 0;
+    fusb_rx_enable(false);
 }
 
 /* ------------------------------------------------------------
@@ -1345,11 +1348,15 @@ static void poll(void)
     if (attached != state.attached) {
         if (attached) {
             state.attached = 1;
-            usart_printf("Attach detected: 0x%02X\r\n", attached);
-            usart_printf("Detecting CC pin...\r\n");
+            usart_printf("[%d] - Attach detected: 0x%02X\r\n", system_millis, attached);
+            usart_printf("[%d] - Detecting CC pin...\r\n", system_millis);
             int polarity = fusb_check_cc_pin();
             int cc_n = polarity ? 2 : 1;
-            usart_printf("CC line on CC%d\r\n", cc_n);
+            usart_printf("[%d] - CC line on CC%d\r\n", system_millis, cc_n);
+            fusb_set_cc(state.pulling_up ? TYPEC_CC_RP : TYPEC_CC_RD);
+            fusb_set_polarity(polarity);
+            fusb_set_msg_header(pd.power_role, pd.data_role);
+            fusb_rx_enable(true);
             fusb_get_status(false);
         } else {
             // reading interrupts clears them, so we need a work around to avoid false positives
@@ -1357,7 +1364,7 @@ static void poll(void)
             int still_attached = fusb_check_cc_voltage();
             // if CC voltage is 0, assume device is not attached (some edge cases will be missed)
             if (!still_attached) {
-                usart_printf("Dettach detected\r\n");
+                usart_printf("[%d] - Dettach detected\r\n", system_millis);
                 // set default state
                 state.attached = 0;
                 state.cc_polarity = 0;
@@ -1365,6 +1372,8 @@ static void poll(void)
                 state.pulling_up = 0;
                 state.tx_sent = 0;
                 pd.msg_id = 0;
+                fusb_set_cc(TYPEC_CC_OPEN);
+                fusb_rx_enable(false);
                 fusb_pd_reset();
             }
         }
@@ -1483,7 +1492,13 @@ int main(void)
             } 
         }
         poll();
+
+        if (state.attached) {
+            if (state.rx_enable) {
+                check_rx_messages();
+            }
+        }
         // small delay to avoid busy looping
-        fusb_delay_ms(1000);
+        fusb_delay_us(1000);
     }
 }
