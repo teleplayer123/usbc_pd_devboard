@@ -1421,17 +1421,15 @@ static int handle_command(char *line) {
         uint16_t header = PD_HEADER(type, prole, drole, id, cnt, rev, ext);
         usart_printf("Sending message with header: 0x%04X\r\n", header);
         fusb_transmit(TYPEC_MESSAGE_TYPE_SOP, header, NULL);
-    } else if (line[0] == 'e') {
-        fusb_rx_enable(true);
-        usart_printf("RX Enabled\r\n");
-    } else if (line[0] == 'd') {
-        fusb_rx_enable(false);
-        usart_printf("RX Disabled\r\n");
+    } else if (line[0] == 'b') {
+        check_rx_buffer();
+    } else if (line[0] == 'p') {
+        pd_send_caps();
     } else if (line[0] == 'q') {
         // return 1 to tell debug_cli to break loop and return to logging
         return 1;
     } else {
-        usart_printf("Commands:\r\n  Read from register:\t\tr <reg>\r\n  Write to register:\t\tw <reg> <val>\r\n  Read bits in register:\tt <reg> \r\n  Status:\t\t\ts \r\n  Check Rx messages:\t\tc  \r\n  Send SOP message:\t\tx <type> <prole> <drole> <id> <cnt> <rev> <ext>  \r\n  Enable Rx:\t\t\te  \r\n  Disable Rx:\t\t\td  \r\n  Quit:\t\t\t\tq  \r\n");
+        usart_printf("Commands:\r\n  Read from register:\t\tr <reg>\r\n  Write to register:\t\tw <reg> <val>\r\n  Read bits in register:\tt <reg> \r\n  Status:\t\t\ts \r\n  Check Rx messages:\t\tc  \r\n  Send SOP message:\t\tx <type> <prole> <drole> <id> <cnt> <rev> <ext>  \r\n  Read FIFO:\t\t\tb  \r\n  Send Capabilities:\t\t\tp  \r\n  Quit:\t\t\t\tq  \r\n");
     }
     return 0;
 }
