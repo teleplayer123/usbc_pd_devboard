@@ -598,7 +598,6 @@ static int fusb_int_vbusok(void)
     }
 }
 
-// hard coded rp to default usb (pull up to 1.5A)
 static void fusb_set_rp_default(void)
 {
     uint8_t reg;
@@ -1314,6 +1313,84 @@ static void pd_init_snk(void)
     state.rx_enable = 0;
     state.vconn_enabled = 0;
     fusb_rx_enable(false);
+    fusb_set_rp_default();
+}
+
+/* ------------------------------------------------------------
+ * Interrupt handling
+ * ------------------------------------------------------------ */
+
+// Checks FUSB302 status and reads any captured PD messages from the FIFO
+static void check_and_read_fifo(void) {
+    // I_CRC_CHK bit in INTERRUPT register indicates a received PD message
+    uint8_t interrupt = fusb_read(FUSB302_REG_INTERRUPT);
+    if (interrupt & FUSB302_INT_CRC_CHK) {
+        usart_printf("PD Message Received Interrupt Detected.\n");
+        // Read packet from RX FIFO
+        // First byte is SOP token
+        uint8_t token = fusb_read(FUSB302_REG_FIFOS);
+        uint8_t packet[32];
+        uint8_t status1 = fusb_read(FUSB302_REG_STATUS1);
+        size_t index = 0;
+
+        // While RX_EMPTY == 0
+        while (!(status1 & FUSB302_STATUS1_RX_EMPTY)) {
+            packet[index++] = fusb_read(FUSB302_REG_FIFOS);
+            status1 = fusb_read(FUSB302_REG_STATUS1);
+        }
+        usart_printf("\n--- PD Message Captured ---\n");
+        usart_printf("Token: 0x%02X\r\n", token);
+        hexdump(packet, index);
+    }
+    // // Try another method: check STATUS1 for RX_FULL
+    // // Read STATUS1 (0x41) to check RX_FULL bit (bit 4) and RX_EMPTY bit (bit 5)
+    // uint8_t status1 = fusb_read(FUSB302_REG_STATUS1);
+    // usart_printf("FUSB302 STATUS1: 0x%02X\n", status1);
+
+    // // Check if the RX_FULL flag is set (PD message received)
+    // if (status1 & FUSB302_STATUS1_RX_FULL) {
+    //     usart_printf("\n--- PD Message Captured ---\n");
+    //     usart_printf("Raw FIFO Bytes (HEX): ");
+    //     check_rx_messages();
+    //     dump_rx_messages();
+    //     usart_printf("--- End of PD Message ---\n");
+    // }
+}
+
+// Handler for EXTI4_15_IRQ (handles PB8 interrupt)
+void exti4_15_isr(void) {
+    if (exti_get_flag_status(EXTI8)) {
+        // Read the Interrupt registers to see what happened and clear the interrupt.
+        uint8_t int_a = fusb_read(FUSB302_REG_INTERRUPTA);
+        uint8_t int_b = fusb_read(FUSB302_REG_INTERRUPTB);
+        uint8_t int_c = fusb_read(FUSB302_REG_INTERRUPT);
+
+        // Hard Reset Received / Sent 
+        if (int_a & FUSB302_INTA_HARDRST) {
+            usart_printf("INT: Hard Reset Detected.\r\n");
+            // Hard Reset requires clearing state and re-toggling DRP.
+            fusb_reset();
+            fusb_setup();
+        }
+
+        // A received message is confirmed when GoodCRC is sent (GCRCSENT)
+        if (int_b & FUSB302_INTB_GCRCSENT) {
+            usart_printf("INT: GoodCRC Sent (Packet Received Confirmation).\r\n");
+            // The packet is waiting in the FIFO
+            check_and_read_fifo();
+        }
+        
+        // --- CC Comparator Change ---
+        if (int_c & FUSB302_INT_COMP_CHNG) {
+            uint8_t status0 = fusb_read(FUSB302_REG_STATUS0);
+            uint8_t bc_lvl = (status0 & FUSB302_STATUS0_BC_LVL_MASK) >> FUSB302_STATUS0_BC_LVL_POS;
+            usart_printf("INT: CC Change (BC_LVL=%02X). Status0: %02X", bc_lvl, status0);
+        }
+        // Clear interrupts
+        fusb_clear_interrupts();
+        // Clear the EXTI
+        exti_reset_request(EXTI8); 
+    }
 }
 
 /* ------------------------------------------------------------
@@ -1379,7 +1456,6 @@ static void poll(void)
             fusb_set_msg_header(pd.power_role, pd.data_role);
             fusb_set_vconn(state.vconn_enabled);
             fusb_rx_enable(true);
-            fusb_clear_interrupts();
             fusb_get_status(false);
         } else {
             // verify device is dettached
