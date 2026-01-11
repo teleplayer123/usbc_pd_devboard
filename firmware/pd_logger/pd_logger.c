@@ -934,7 +934,7 @@ static int fusb_mdac_comp(int mdac)
     // set mdac to reg_measure bits 0-5 and set bit 6 to measure vbus
     fusb_write(FUSB302_REG_MEASURE, (mdac & FUSB302_MEAS_MDAC_MASK) | FUSB302_MEAS_VBUS);
     fusb_delay_us(350);
-    // Read status0 register, if STATUS0_COMP=1 then vbus is higher than mdac * 0.42V
+    // Read status0 register, if STATUS0_COMP=1 then vbus is higher than (mdac + 1) * 0.42V
     reg = fusb_read(FUSB302_REG_STATUS0);
     // restore original value
     fusb_write(FUSB302_REG_MEASURE, orig_reg);
@@ -953,7 +953,7 @@ static int fusb_measure_vbus_voltage(void)
             mdac |= (1 << i);
         }
     }
-    vbus = mdac * 420;
+    vbus = (mdac + 1) * 420;
     return vbus;
 }
 
