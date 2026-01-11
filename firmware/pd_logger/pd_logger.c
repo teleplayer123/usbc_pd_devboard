@@ -558,13 +558,6 @@ static void fusb_clear_interrupts(bool verbose)
     }
 }
 
-static uint8_t fusb_check_attach(void)
-{
-    uint8_t reg;
-    reg = fusb_read(FUSB302_REG_INTERRUPTA);
-    return reg & FUSB302_INTA_TOGDONE;
-}
-
 static void fusb_sop_prime_enable(bool enable)
 {
     uint8_t reg;
@@ -1530,9 +1523,7 @@ int main(void)
                 debug_cli();
             } 
         }
-        if (fusb_check_attach()) {
-            poll();
-        }
+        poll();
 
         if (state.attached) {
             if (state.rx_enable) {
