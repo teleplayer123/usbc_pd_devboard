@@ -558,6 +558,13 @@ static void fusb_clear_interrupts(bool verbose)
     }
 }
 
+static uint8_t fusb_check_attach(void)
+{
+    uint8_t reg;
+    reg = fusb_read(FUSB302_REG_INTERRUPTA);
+    return reg & FUSB302_INTA_TOGDONE;
+}
+
 static void fusb_sop_prime_enable(bool enable)
 {
     uint8_t reg;
@@ -1287,7 +1294,7 @@ static void fusb_setup(void)
     reg &= ~FUSB302_MASKB_GCRCSENT;
     fusb_write(FUSB302_REG_MASKB, reg);
 
-    // CONTROL0 Enable interrupt
+    // CONTROL0 mask interrupt
     reg = fusb_read(FUSB302_REG_CONTROL0);
     reg &= ~FUSB302_CTL0_INT_MASK;
     fusb_write(FUSB302_REG_CONTROL0, reg);
@@ -1523,8 +1530,9 @@ int main(void)
                 debug_cli();
             } 
         }
-        // TODO: have poll check interrupts and move state updates out of poll
-        poll();
+        if (fusb_check_attach()) {
+            poll();
+        }
 
         if (state.attached) {
             if (state.rx_enable) {
