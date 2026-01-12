@@ -19,6 +19,7 @@
  * Globals
  * ------------------------------------------------------------ */
 
+#define DEBUG_DUMP 1
 #define I2C_TIMEOUT 100000
 
 #define PACKET_IS_GOOD_CRC(head) (PD_HEADER_TYPE(head) == PD_CTRL_GOOD_CRC && PD_HEADER_CNT(head) == 0)
@@ -1336,10 +1337,13 @@ void exti4_15_isr(void) {
         if (int_b & FUSB302_INTB_GCRCSENT) {
             usart_printf("INT: GoodCRC Sent (Packet Received Confirmation).\r\n");
             if (int_c & FUSB302_INT_CRC_CHK) {
-                // read FIFO (for debugging)
+#ifdef DEBUG_DUMP
                 check_rx_buffer();
+#else
                 // I_CRC_CHK bit in INTERRUPT register indicates a received PD message
-                check_rx_messages(); // messages can be dumped in the debug cli
+                check_rx_messages();
+                dump_rx_messages();
+#endif
             }
         }
         
