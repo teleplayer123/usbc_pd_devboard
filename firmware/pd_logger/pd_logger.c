@@ -453,11 +453,8 @@ static void fusb_check_mask_regs(void)
 static void check_rx_buffer(void)
 {
     uint8_t buffer[80];
-    // dump fifo if not empty
-    if (!fusb_rx_empty()) {
-        fusb_read_fifo(buffer, 80);
-        hexdump(buffer, 80);
-    }
+    fusb_read_fifo(buffer, 80);
+    hexdump(buffer, 80);
 }
 
 // Print current state struct values for debugging
@@ -1024,10 +1021,6 @@ static int fusb_get_message(uint32_t *payload, uint16_t *head)
     uint8_t buf[32];
     int rv;
     int len;
-
-    // Nothing to read
-    if (fusb_rx_empty())
-        return -1;
 
     do {
         buf[0] = FUSB302_REG_FIFOS;
