@@ -19,7 +19,7 @@
  * Globals
  * ------------------------------------------------------------ */
 
-#define DEBUG_DUMP 1
+#define DEBUG_DUMP 0
 #define I2C_TIMEOUT 100000
 
 #define PACKET_IS_GOOD_CRC(head) (PD_HEADER_TYPE(head) == PD_CTRL_GOOD_CRC && PD_HEADER_CNT(head) == 0)
