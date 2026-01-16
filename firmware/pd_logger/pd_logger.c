@@ -19,75 +19,6 @@
  * Globals
  * ------------------------------------------------------------ */
 
-/*
-void pd_parse_message(uint8_t *msg) {
-    // 1. Extract the 16-bit Message Header (LSB first) [1, 2]
-    uint16_t header = (uint16_t)msg | ((uint16_t)msg[3] << 8);
-
-    // 2. Decode Header Fields [1, 4]
-    bool is_extended = (header >> 15) & 0x01;             // Bit 15: Extended [4, 5]
-    uint8_t num_obj   = (header >> 12) & 0x07;            // Bits 14..12: Number of Data Objects [6]
-    uint8_t msg_id    = (header >> 9)  & 0x07;            // Bits 11..9: MessageID [7]
-    uint8_t pwr_role  = (header >> 8)  & 0x01;            // Bit 8: Port Power Role (0=Sink, 1=Source) [8]
-    uint8_t rev       = (header >> 6)  & 0x03;            // Bits 7..6: Specification Revision [9]
-    uint8_t data_role = (header >> 5)  & 0x01;            // Bit 5: Port Data Role (0=UFP, 1=DFP) [10]
-    uint8_t msg_type  = header & 0x1F;                    // Bits 4..0: Message Type [11]
-
-    // 3. Print General Header Info
-    printf("--- USB PD Message ---\n");
-    printf("ID: %d | Rev: %s | %s | %s\n", 
-            msg_id, 
-            (rev == 0x01) ? "2.0" : (rev == 0x02) ? "3.x" : "Unknown", 
-            (pwr_role == 1) ? "Source" : "Sink", 
-            (data_role == 1) ? "DFP" : "UFP");
-
-    // 4. Identify Message Type [12, 13]
-    if (is_extended) {
-        // Extended Message Handling [5, 14, 15]
-        uint16_t ext_header = (uint16_t)msg[16] | ((uint16_t)msg[17] << 8);
-        uint16_t data_size = ext_header & 0x1FF;
-        printf("Type: EXTENDED (0x%02X) | Size: %d bytes\n", msg_type, data_size);
-        
-    } else if (num_obj == 0) {
-        // Control Message Parsing (Num Objects = 0) [18, 19]
-        const char* type_str = "Reserved";
-        switch(msg_type) {
-            case 0x01: type_str = "GoodCRC"; break;       // [19, 20]
-            case 0x03: type_str = "Accept"; break;        // [19, 21]
-            case 0x04: type_str = "Reject"; break;        // [19, 22]
-            case 0x06: type_str = "PS_RDY"; break;        // [19, 23]
-            case 0x07: type_str = "Get_Source_Cap"; break;// [19, 23]
-            case 0x09: type_str = "DR_Swap"; break;       // [19, 24]
-            case 0x0A: type_str = "PR_Swap"; break;       // [19, 25]
-            case 0x0D: type_str = "Soft_Reset"; break;    // [19, 26]
-            case 0x10: type_str = "Not_Supported"; break; // [19, 27]
-        }
-        printf("Type: CONTROL | %s\n", type_str);
-
-    } else {
-        // Data Message Parsing (Num Objects > 0) [13, 28]
-        const char* type_str = "Reserved";
-        switch(msg_type) {
-            case 0x01: type_str = "Source_Capabilities"; break; // [13, 29]
-            case 0x02: type_str = "Request"; break;             // [13, 30]
-            case 0x04: type_str = "Sink_Capabilities"; break;   // [13, 31]
-            case 0x0F: type_str = "Vendor_Defined"; break;      // [13, 32]
-        }
-        printf("Type: DATA | %s | Objects: %d\n", type_str, num_obj);
-
-        // 5. Briefly parse Data Objects (32-bit each) [33, 34]
-        for (int i = 0; i < num_obj; i++) {
-            uint32_t obj = (uint32_t)msg[2 + i*4]         | 
-                          ((uint32_t)msg[3 + i*4] << 8)   |
-                          ((uint32_t)msg[4 + i*4] << 16)  |
-                          ((uint32_t)msg[5 + i*4] << 24);
-            printf("  OBJ[%d]: 0x%08X\n", i + 1, obj);
-        }
-    }
-    printf("----------------------\n");
-}
-*/
-
 //#define DEBUG_DUMP
 #define I2C_TIMEOUT 100000
 
@@ -1332,6 +1263,88 @@ static void fusb_setup(void)
  * PD Helpers
  * ------------------------------------------------------------ */
 
+static const char *pd_ctrl_msg_name(uint8_t type)
+{
+    switch (type) {
+    case 0x01: return "GoodCRC";
+    case 0x02: return "GotoMin";
+    case 0x03: return "Accept";
+    case 0x04: return "Reject";
+    case 0x05: return "Ping";
+    case 0x06: return "PS_RDY";
+    case 0x07: return "Get_Source_Cap";
+    case 0x08: return "Get_Sink_Cap";
+    case 0x09: return "DR_Swap";
+    case 0x0A: return "PR_Swap";
+    case 0x0B: return "VCONN_Swap";
+    case 0x0C: return "Wait";
+    case 0x0D: return "Soft_Reset";
+    default:   return "Unknown_CTRL";
+    }
+}
+
+static const char *pd_data_msg_name(uint8_t type)
+{
+    switch (type) {
+    case 0x01: return "Source_Capabilities";
+    case 0x02: return "Request";
+    case 0x03: return "BIST";
+    case 0x04: return "Sink_Capabilities";
+    case 0x05: return "Battery_Status";
+    case 0x06: return "Alert";
+    case 0x0F: return "Vendor_Defined";
+    default:   return "Unknown_DATA";
+    }
+}
+
+static void pd_log_header(uint16_t header)
+{
+    uint8_t cnt = PD_HEADER_CNT(header);
+    uint8_t id = PD_HEADER_ID(header);
+    uint8_t type = PD_HEADER_TYPE(header);
+    uint8_t rev = PD_HEADER_REV(header);
+    //uint8_t ext = PD_HEADER_EXT(header);
+
+    usart_printf("PD Rx Header: 0x%04X\r\n", header);
+    usart_printf("\tMsgID: 0x%02X\r\n", id);
+    usart_printf("\tRev: PD%d.0\r\n", rev+1);
+    usart_printf("\tCount: %d\r\n", cnt);
+
+    if (cnt > 0)
+        usart_printf("\tType: %s\r\n", pd_ctrl_msg_name(type));
+    else
+        usart_printf("\tType: %s\r\n", pd_data_msg_name(type));
+}
+
+static void pd_log_source_caps(const uint32_t *pdo, int count)
+{
+    for (int i = 0; i < count; i++) {
+        uint32_t p = pdo[i];
+
+        uint8_t type = (p >> 30) & 0x3;
+
+        if (type == 0) { // Fixed
+            int mv = ((p >> 10) & 0x3FF) * 50;
+            int ma = (p & 0x3FF) * 10;
+            usart_printf("\tPDO%d: Fixed %dmV @ %dmA\r\n", i + 1, mv, ma);
+        } else {
+            usart_printf("\tPDO%d: Unsupported PDO type %u\r\n", i + 1, type);
+        }
+    }
+}
+
+static void pd_log_request(uint32_t rdo)
+{
+    int obj_pos = (rdo >> 28) & 0x7;
+    int op_ma   = (rdo & 0x3FF) * 10;
+    int max_ma  = ((rdo >> 10) & 0x3FF) * 10;
+
+    usart_printf("RDO:\r\n");
+    usart_printf("\tObject: %d\r\n", obj_pos);
+    usart_printf("\tOper: %dmA\r\n", op_ma);
+    usart_printf("\tMax: %dmA\r\n", max_ma);
+}
+
 static void pd_check_rx_messages(void)
 {
     uint16_t head;
@@ -1354,10 +1367,28 @@ static void pd_dump_rx_messages(void)
 {
     for (int i = 0; i <= rx_messages_idx; i++) {
         usart_printf("---- RX Message %d ----\r\n", i);
-        usart_printf("Header=0x%04X\r\n", rx_messages[i].head);
-        int hdr_cnt = PD_HEADER_CNT(rx_messages[i].head);
-        for (int j = 0; j < hdr_cnt; j++)
-            usart_printf("Payload[%d]: 0x%08X\r\n", j, rx_messages[i].payload[j]);
+        int cnt = PD_HEADER_CNT(rx_messages[i].head);
+        int type = PD_HEADER_TYPE(rx_messages[i].head);
+
+        pd_log_header(rx_messages[i].head);
+        if (cnt == 0) // control message
+            continue;
+        
+        switch (type) {
+            case 0x01:
+                // source capabilities
+                pd_log_source_caps(rx_messages[i].payload, cnt);
+                break;
+            case 0x02:
+                // request
+                pd_log_request(rx_messages[i].payload[0]);
+                break;
+            default:
+                for (int j = 0; j < cnt; j++)
+                    usart_printf("Payload[%d]: 0x%08X\r\n", j, rx_messages[i].payload[j]);
+                break;
+        }
+
         usart_printf("-----------------------\r\n");
     }
 }
