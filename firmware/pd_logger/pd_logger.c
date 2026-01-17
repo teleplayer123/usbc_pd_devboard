@@ -1189,8 +1189,9 @@ static int fusb_transmit(enum tcpc_message_type type, uint16_t header, const uin
 static void fusb_get_status(bool verbose)
 {
     usart_printf("[%d] --- Status Update ---\r\n", system_millis);
-    fusb_check_status_regs();
+    // log current fusb302 register state
     if (verbose) {
+        fusb_check_status_regs();
         fusb_check_switches_regs();
         fusb_check_control_regs();
         fusb_check_mask_regs();
@@ -1266,34 +1267,55 @@ static void fusb_setup(void)
 static const char *pd_ctrl_msg_name(uint8_t type)
 {
     switch (type) {
-    case 0x01: return "GoodCRC";
-    case 0x02: return "GotoMin";
-    case 0x03: return "Accept";
-    case 0x04: return "Reject";
-    case 0x05: return "Ping";
-    case 0x06: return "PS_RDY";
-    case 0x07: return "Get_Source_Cap";
-    case 0x08: return "Get_Sink_Cap";
-    case 0x09: return "DR_Swap";
-    case 0x0A: return "PR_Swap";
-    case 0x0B: return "VCONN_Swap";
-    case 0x0C: return "Wait";
-    case 0x0D: return "Soft_Reset";
-    default:   return "Unknown_CTRL";
+        case PD_CTRL_INVALID: return "Invalid";
+        case PD_CTRL_GOOD_CRC: return "GoodCRC";
+        case PD_CTRL_GOTO_MIN: return "GotoMin";
+        case PD_CTRL_ACCEPT: return "Accept";
+        case PD_CTRL_REJECT: return "Reject";
+        case PD_CTRL_PING: return "Ping";
+        case PD_CTRL_PS_RDY: return "PS_RDY";
+        case PD_CTRL_GET_SOURCE_CAP: return "Get_Source_Cap";
+        case PD_CTRL_GET_SINK_CAP: return "Get_Sink_Cap";
+        case PD_CTRL_DR_SWAP: return "DR_Swap";
+        case PD_CTRL_PR_SWAP: return "PR_Swap";
+        case PD_CTRL_VCONN_SWAP: return "VCONN_Swap";
+        case PD_CTRL_WAIT: return "Wait";
+        case PD_CTRL_SOFT_RESET: return "Soft_Reset";
+        /* Used for REV 3.0 */
+        case PD_CTRL_DATA_RESET: return "Reset";
+        case PD_CTRL_DATA_RESET_COMPLETE: return "Reset_Complete";
+        case PD_CTRL_NOT_SUPPORTED: return "Not_Supported";
+        case PD_CTRL_GET_SOURCE_CAP_EXT: return "Get_Source_Cap_Ext";
+        case PD_CTRL_GET_STATUS: return "Get_Status";
+        case PD_CTRL_FR_SWAP: return "FR_Swap";
+        case PD_CTRL_GET_PPS_STATUS: return "Get_PPS_Status";
+        case PD_CTRL_GET_COUNTRY_CODES: return "Get_Country_Code";
+        case PD_CTRL_GET_SINK_CAP_EXT: return "Get_Sink_Cap_Ext";
+        /* Used for REV 3.1 */
+        case PD_CTRL_GET_SOURCE_INFO: return "Get_Source_Info";
+        case PD_CTRL_GET_REVISION: return "Get_Revision";
+        default:   return "Unknown_CTRL";
     }
 }
 
 static const char *pd_data_msg_name(uint8_t type)
 {
     switch (type) {
-    case 0x01: return "Source_Capabilities";
-    case 0x02: return "Request";
-    case 0x03: return "BIST";
-    case 0x04: return "Sink_Capabilities";
-    case 0x05: return "Battery_Status";
-    case 0x06: return "Alert";
-    case 0x0F: return "Vendor_Defined";
-    default:   return "Unknown_DATA";
+        case PD_DATA_INVALID: return "Invalid";
+        case PD_DATA_SOURCE_CAPABILITIES: return "Source_Capabilities";
+        case PD_DATA_REQUEST: return "Request";
+        case PD_DATA_BIST: return "BIST";
+        case PD_DATA_SINK_CAPABILITIES: return "Sink_Capabilities";
+        case PD_DATA_BATTERY_STATUS: return "Battery_Status";
+        case PD_DATA_ALERT: return "Alert";
+        case PD_DATA_GET_COUNTRY_INFO: return "Get_Country_Info";
+        case PD_DATA_ENTER_USB: return "Enter_USB";
+        case PD_DATA_EPR_REQUEST: return "EPR_Request";
+        case PD_DATA_EPR_MODE: return "EPR_Mode";
+        case PD_DATA_SOURCE_INFO: return "Source_Info";
+        case PD_DATA_REVISION: return "Revision";
+        case PD_DATA_VENDOR_DEFINED: return "Vendor_Defined";
+        default:   return "Unknown_DATA";
     }
 }
 
@@ -1397,7 +1419,7 @@ static void pd_init_src(void)
 {
     pd.power_role = PD_POWER_ROLE_SOURCE;
     pd.data_role = PD_DATA_ROLE_DFP;
-    pd.rev = PD_SPEC_REV2;
+    pd.rev = PD_SPEC_REV3;
     pd.msg_id = 0;
     state.pulling_up = 1;
     state.rx_enable = 0;
@@ -1409,7 +1431,7 @@ static void pd_init_snk(void)
 {
     pd.power_role = PD_POWER_ROLE_SINK;
     pd.data_role = PD_DATA_ROLE_UFP;
-    pd.rev = PD_SPEC_REV2;
+    pd.rev = PD_SPEC_REV3;
     pd.msg_id = 0;
     state.pulling_up = 0;
     state.rx_enable = 0;
@@ -1483,7 +1505,7 @@ void exti4_15_isr(void) {
 
         // A received message is confirmed when GoodCRC is sent (GCRCSENT)
         if (int_b & FUSB302_INTB_GCRCSENT) {
-            usart_printf("INT: GoodCRC Sent (Packet Received Confirmation).\r\n");
+            usart_printf("INT: GoodCRC Sent (Packet Received)\r\n");
             if (int_c & FUSB302_INT_CRC_CHK) {
 #ifdef DEBUG_DUMP
                 check_rx_buffer();
@@ -1499,7 +1521,7 @@ void exti4_15_isr(void) {
         if (int_c & FUSB302_INT_COMP_CHNG) {
             uint8_t status0 = fusb_read(FUSB302_REG_STATUS0);
             uint8_t bc_lvl = (status0 & FUSB302_STATUS0_BC_LVL_MASK) >> FUSB302_STATUS0_BC_LVL_POS;
-            usart_printf("INT: CC Change (BC_LVL=%02X). Status0: %02X\r\n", bc_lvl, status0);
+            usart_printf("INT: CC Change (BC_LVL=0x%02X) Status0: 0x%02X\r\n", bc_lvl, status0);
         }
         // Clear interrupts
         fusb_clear_interrupts();
@@ -1663,7 +1685,7 @@ int main(void)
         poll();
 
         // small delay to avoid busy looping
-        fusb_delay_ms(100);
+        fusb_delay_ms(700);
     }
 
 }
