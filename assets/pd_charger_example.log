@@ -1,6 +1,6 @@
-[128854] - Attach detected
-[128860] - CC line on CC2
-[128871] --- Status Update ---
+[38208] - Attach detected
+[38214] - CC line on CC1
+[38225] --- Status Update ---
 ---- STATUS0 ----
 VBUSOK = 1
 ACTIVITY = 0
@@ -37,9 +37,23 @@ RXSOP2DB = 0
 RXSOP1DB = 0
 RXSOP = 0
 
-INT pin=01
----- Current FUSB302 State ----
-CC Polarity: 1
+---- Current FUSB302 StINT: GoodCRC Sent (Packet Received Confirmation).
+---- RX Message 0 ----
+PD Rx Header: 0x108F
+	MsgID: 0x00
+	Rev: PD3.0
+	Count: 1
+	Type: Unknown_CTRL
+Payload[0]: 0x20108FC0
+-----------------------
+---- RX Message 1 ----
+PD Rx Header: 0x0000
+	MsgID: 0x00
+	Rev: PD1.0
+	Count: 0
+	Type: Unknown_DATA
+ate ----
+CC Polarity: 0
 VCONN Enabled: 0
 Pulling Down (UFP): 0
 RX Enable: 1
@@ -47,16 +61,93 @@ MDAC VNC: 0x26
 MDAC RD: 0x05
 Device Attached: True
 ---- End State ----
+INT: Hard Reset Detected.
+INT: CC Change (BC_LVL=00). Status0: 80
 VBUS Voltage: 5040 mV
 CC voltage: 2688 mV
-[129005] --- End Status Update ---
-[140714] - Dettach detected
-Logging paused. Entering debug menu...
----- PD Logger Debug Console ----
-s
-[147339] --- Status Update ---
+[38359] --- End Status Update ---
+[38461] - Attach detected
+[38467] - CC line on CC1
+[38478] --- Status Update ---
 ---- STATUS0 ----
 VBUSOK = 0
+ACTIVITY = 0
+COMP = 0
+CRC_CHK = 0
+ALERT = 0
+WAKE = 0
+BC_LVL1 = 1
+BC_LVL0 = 1
+
+---- STATUS1 ----
+RXSOP2 = 0
+RXSOP1 = 0
+RX_EMPTY = 1
+RX_FULL = 0
+TX_EMPTY = 1
+TX_FULL = 0
+OVRTEMP = 0
+OCP = 0
+
+---- STATUS0A ----
+SOFTFAIL = 0
+RETRYFAIL = 0
+POWER3 = 1
+POWER2 = 1
+SOFTRST = 0
+HARDRST = 0
+
+---- STATUS1A ----
+TOGSS3 = 0
+TOGSS2 = 0
+TOGSS1 = 0
+RXSOP2DB = 0
+RXSOP1DB = 0
+RXSOP = 0
+
+---- Current FUSB302 State ----
+CC Polarity: 0
+VCONN Enabled: 0
+Pulling Down (UFP): 0
+RX Enable: 1
+MDAC VNC: 0x26
+MDAC RD: 0x05
+Device Attached: True
+---- End State ----
+VBUS Voltage: 420 mV
+CC voltage: 2688 mV
+[38611] --- End Status Update ---
+Logging paused. Entering debug menu...
+---- PD Logger Debug Console ----
+INT: GoodCRC Sent (Packet Received Confirmation).
+---- RX Message 0 ----
+PD Rx Header: 0x108F
+	MsgID: 0x00
+	Rev: PD3.0
+	Count: 1
+	Type: Unknown_CTRL
+Payload[0]: 0x20108FC0
+-----------------------
+---- RX Message 1 ----
+PD Rx Header: 0x108F
+	MsgID: 0x00
+	Rev: PD3.0
+	Count: 1
+	Type: Unknown_CTRL
+Payload[0]: 0x40108FC0
+-----------------------
+---- RX Message 2 ----
+PD Rx Header: 0x0000
+	MsgID: 0x00
+	Rev: PD1.0
+	Count: 0
+	Type: Unknown_DATA
+INT: CC Change (BC_LVL=03). Status0: 93
+INT: Hard Reset Detected.
+s
+[47989] --- Status Update ---
+---- STATUS0 ----
+VBUSOK = 1
 ACTIVITY = 0
 COMP = 0
 CRC_CHK = 0
@@ -107,7 +198,7 @@ SPECREV1 = 0
 SPECREV0 = 1
 DATAROLE = 0
 AUTO_GCRC = 0
-TXCC2 = 1
+TXCC2 = 0
 TXCC1 = 0
 
 ---- CONTROL0 ----
@@ -167,369 +258,620 @@ HARDRST = 0
 ---- MASKB ----
 GCRCSENT = 0
 
-INT pin=01
 ---- Current FUSB302 State ----
 CC Polarity: 0
 VCONN Enabled: 0
 Pulling Down (UFP): 0
-RX Enable: 0
+RX Enable: 1
 MDAC VNC: 0x26
 MDAC RD: 0x05
 Device Attached: False
 ---- End State ----
-VBUS Voltage: 420 mV
-CC voltage: 0 mV
-[147507] --- End Status Update ---
-> c
----- RX Message 0 ----
-Header=0x108F
-Payload[0]: 0x20108FC0
-Payload[1]: 0xFFFFFFFF
-Payload[2]: 0xFFFFFFFF
-Payload[3]: 0xFFFFFFFF
-Payload[4]: 0x20000010
-Payload[5]: 0x40005400
-Payload[6]: 0x00000001
------------------------
----- RX Message 1 ----
-Header=0x00A0
-Payload[0]: 0x00000B02
-Payload[1]: 0x00000040
-Payload[2]: 0x080002E3
-Payload[3]: 0x00000000
-Payload[4]: 0x00000000
-Payload[5]: 0x200009B4
-Payload[6]: 0x08000895
------------------------
----- RX Message 2 ----
-Header=0x45A4
-Payload[0]: 0x0045A4FF
-Payload[1]: 0x00000000
-Payload[2]: 0x20003F84
-Payload[3]: 0x00000B02
-Payload[4]: 0x00000031
-Payload[5]: 0x0000015E
-Payload[6]: 0x08000107
------------------------
----- RX Message 3 ----
-Header=0xC072
-Payload[0]: 0x00C07202
-Payload[1]: 0x00000000
-Payload[2]: 0x20003F84
-Payload[3]: 0x00000B02
-Payload[4]: 0x00000031
-Payload[5]: 0x0000015E
-Payload[6]: 0x08000107
------------------------
----- RX Message 4 ----
-Header=0x0110
-Payload[0]: 0x00000001
-Payload[1]: 0x20003F84
-Payload[2]: 0x00000040
-Payload[3]: 0x0000000B
-Payload[4]: 0x00000031
-Payload[5]: 0x0000015E
-Payload[6]: 0x08000107
------------------------
----- RX Message 5 ----
-Header=0xFF00
-Payload[0]: 0x00FF00A0
-Payload[1]: 0x00000000
-Payload[2]: 0x20003F84
-Payload[3]: 0x00000B02
-Payload[4]: 0x00000040
-Payload[5]: 0x080002E3
-Payload[6]: 0x00000000
------------------------
----- RX Message 6 ----
-Header=0xEA5B
-Payload[0]: 0x00EA5B10
-Payload[1]: 0x00000000
-Payload[2]: 0x20003F84
-Payload[3]: 0x00000B02
-Payload[4]: 0x00000040
-Payload[5]: 0x080002E3
-Payload[6]: 0x08000107
------------------------
----- RX Message 7 ----
-Header=0xA1E0
-Payload[0]: 0x00A1E063
-Payload[1]: 0x00000000
-Payload[2]: 0x00000040
-Payload[3]: 0x0000000B
-Payload[4]: 0x00000031
-Payload[5]: 0x0000015E
-Payload[6]: 0x08000107
------------------------
----- RX Message 8 ----
-Header=0x912C
-Payload[0]: 0x00912C51
-Payload[1]: 0x20003F84
-Payload[2]: 0x00000040
-Payload[3]: 0x0000000B
-Payload[4]: 0x00000031
-Payload[5]: 0x0000015E
-Payload[6]: 0x08000107
------------------------
----- RX Message 9 ----
-Header=0x2C0A
-Payload[0]: 0x002C0A01
-Payload[1]: 0x00000000
-Payload[2]: 0x00000040
-Payload[3]: 0x0000000B
-Payload[4]: 0x00000031
-Payload[5]: 0x0000015E
-Payload[6]: 0x08000107
------------------------
----- RX Message 10 ----
-Header=0x0002
-Payload[0]: 0x00000001
-Payload[1]: 0x20003F84
-Payload[2]: 0x00000040
-Payload[3]: 0x0000000B
-Payload[4]: 0x00000031
-Payload[5]: 0x0000015E
-Payload[6]: 0x08000107
------------------------
----- RX Message 11 ----
-Header=0x03C1
-Payload[0]: 0x00000001
-Payload[1]: 0x20003F84
-Payload[2]: 0x00000040
-Payload[3]: 0x0000000B
-Payload[4]: 0x00000031
-Payload[5]: 0x0000015E
-Payload[6]: 0x08000107
------------------------
----- RX Message 12 ----
-Header=0xB12C
-Payload[0]: 0x00B12C00
-Payload[1]: 0x00000000
-Payload[2]: 0x20003F84
-Payload[3]: 0x0000000B
-Payload[4]: 0x00000031
-Payload[5]: 0x0000015E
-Payload[6]: 0x08000107
------------------------
----- RX Message 13 ----
-Header=0x2C00
-Payload[0]: 0x002C0004
-Payload[1]: 0x00000000
-Payload[2]: 0x00000040
-Payload[3]: 0x0000000B
-Payload[4]: 0x00000031
-Payload[5]: 0x0000015E
-Payload[6]: 0x08000107
------------------------
----- RX Message 14 ----
-Header=0x0006
-Payload[0]: 0x00000001
-Payload[1]: 0x20003F84
-Payload[2]: 0x00000040
-Payload[3]: 0x0000000B
-Payload[4]: 0x00000031
-Payload[5]: 0x0000015E
-Payload[6]: 0x08000107
------------------------
----- RX Message 15 ----
-Header=0xB8E1
-Payload[0]: 0x00B8E1AA
-Payload[1]: 0x00000000
-Payload[2]: 0x20003F84
-Payload[3]: 0x0000000B
-Payload[4]: 0x00000031
-Payload[5]: 0x0000015E
-Payload[6]: 0x08000107
------------------------
----- RX Message 16 ----
-Header=0x0000
-Payload[0]: 0x00000001
-Payload[1]: 0x20003F84
-Payload[2]: 0x00000040
-Payload[3]: 0x0000000B
-Payload[4]: 0x00000031
-Payload[5]: 0x0000015E
-Payload[6]: 0x08000107
------------------------
----- RX Message 17 ----
-Header=0x108F
-Payload[0]: 0x20108FC0
-Payload[1]: 0x080015D6
-Payload[2]: 0x41000000
-Payload[3]: 0x40005400
-Payload[4]: 0x28010000
-Payload[5]: 0x40005400
-Payload[6]: 0x00000001
------------------------
----- RX Message 18 ----
-Header=0x00A0
-Payload[0]: 0x00000001
-Payload[1]: 0x000000F1
-Payload[2]: 0x3F000B1D
-Payload[3]: 0x0800B099
-Payload[4]: 0x01000003
-Payload[5]: 0x40005400
-Payload[6]: 0x00000001
------------------------
----- RX Message 19 ----
-Header=0x45A4
-Payload[0]: 0x0045A4FF
-Payload[1]: 0x00000000
-Payload[2]: 0x20003F84
-Payload[3]: 0x00000B02
-Payload[4]: 0x00000031
-Payload[5]: 0x0000015E
-Payload[6]: 0x08000107
------------------------
----- RX Message 20 ----
-Header=0xC072
-Payload[0]: 0x20C07202
-Payload[1]: 0x20003FA7
-Payload[2]: 0x00000A80
-Payload[3]: 0x00000000
-Payload[4]: 0x00000031
-Payload[5]: 0x40005400
-Payload[6]: 0x00000001
------------------------
----- RX Message 21 ----
-Header=0x0110
-Payload[0]: 0x00000001
-Payload[1]: 0x20003F84
-Payload[2]: 0x00000040
-Payload[3]: 0x0000000B
-Payload[4]: 0x00000031
-Payload[5]: 0x0000015E
-Payload[6]: 0x08000107
------------------------
----- RX Message 22 ----
-Header=0xFF00
-Payload[0]: 0x00FF00A0
-Payload[1]: 0x00000000
-Payload[2]: 0x20003F84
-Payload[3]: 0x00000B02
-Payload[4]: 0x00000040
-Payload[5]: 0x080002E3
-Payload[6]: 0x00000000
------------------------
----- RX Message 23 ----
-Header=0xEA5B
-Payload[0]: 0x00EA5B10
-Payload[1]: 0x00000000
-Payload[2]: 0x20003F84
-Payload[3]: 0x00000B02
-Payload[4]: 0x00000040
-Payload[5]: 0x080002E3
-Payload[6]: 0x08000107
------------------------
----- RX Message 24 ----
-Header=0xA1E0
-Payload[0]: 0x00A1E063
-Payload[1]: 0x00000000
-Payload[2]: 0x00000040
-Payload[3]: 0x0000000B
-Payload[4]: 0x00000031
-Payload[5]: 0x0000015E
-Payload[6]: 0x08000107
------------------------
----- RX Message 25 ----
-Header=0x912C
-Payload[0]: 0x00912C51
-Payload[1]: 0x20003F84
-Payload[2]: 0x00000040
-Payload[3]: 0x0000000B
-Payload[4]: 0x00000031
-Payload[5]: 0x0000015E
-Payload[6]: 0x08000107
------------------------
----- RX Message 26 ----
-Header=0x2C0A
-Payload[0]: 0x002C0A01
-Payload[1]: 0x00000000
-Payload[2]: 0x00000040
-Payload[3]: 0x0000000B
-Payload[4]: 0x00000031
-Payload[5]: 0x0000015E
-Payload[6]: 0x08000107
------------------------
----- RX Message 27 ----
-Header=0x0002
-Payload[0]: 0x00000001
-Payload[1]: 0x20003F84
-Payload[2]: 0x00000040
-Payload[3]: 0x0000000B
-Payload[4]: 0x00000031
-Payload[5]: 0x0000015E
-Payload[6]: 0x08000107
------------------------
----- RX Message 28 ----
-Header=0x03C1
-Payload[0]: 0x00000001
-Payload[1]: 0x20003F84
-Payload[2]: 0x00000040
-Payload[3]: 0x0000000B
-Payload[4]: 0x00000031
-Payload[5]: 0x0000015E
-Payload[6]: 0x08000107
------------------------
----- RX Message 29 ----
-Header=0xB12C
-Payload[0]: 0x00B12C00
-Payload[1]: 0x00000000
-Payload[2]: 0x20003F84
-Payload[3]: 0x0000000B
-Payload[4]: 0x00000031
-Payload[5]: 0x0000015E
-Payload[6]: 0x08000107
------------------------
----- RX Message 30 ----
-Header=0x2C00
-Payload[0]: 0x002C0004
-Payload[1]: 0x00000000
-Payload[2]: 0x00000040
-Payload[3]: 0x0000000B
-Payload[4]: 0x00000031
-Payload[5]: 0x0000015E
-Payload[6]: 0x08000107
------------------------
----- RX Message 31 ----
-Header=0x0006
-Payload[0]: 0x00000001
-Payload[1]: 0x20003F84
-Payload[2]: 0x00000040
-Payload[3]: 0x0000000B
-Payload[4]: 0x00000031
-Payload[5]: 0x0000015E
-Payload[6]: 0x08000107
------------------------
----- RX Message 32 ----
-Header=0xB8E1
-Payload[0]: 0x00B8E1AA
-Payload[1]: 0x00000000
-Payload[2]: 0x20003F84
-Payload[3]: 0x0000000B
-Payload[4]: 0x00000031
-Payload[5]: 0x0000015E
-Payload[6]: 0x08000107
------------------------
----- RX Message 33 ----
-Header=0x0000
-Payload[0]: 0x00000001
-Payload[1]: 0x20003F84
-Payload[2]: 0x00000040
-Payload[3]: 0x0000000B
-Payload[4]: 0x00000031
-Payload[5]: 0x0000015E
-Payload[6]: 0x08000107
------------------------
----- RX Message 34 ----
-Header=0x0000
-Payload[0]: 0x00000000
-Payload[1]: 0x00000000
-Payload[2]: 0x00000000
-Payload[3]: 0x00000000
-Payload[4]: 0x00000000
-Payload[5]: 0x00000000
-Payload[6]: 0x00000000
------------------------
+VBUS Voltage: 5040 mV
+CC voltage: 2688 mV
+[48214] --- End Status Update ---
+0000: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  | ................
+0010: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  | ................
+0020: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  | ................
+0030: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  | ................
+0040: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  | ................
 > q
 Returning to live logging...
+[51768] - Attach detected
+[51774] - CC line on CC1
+[51785] --- Status Update ---
+---- STATUS0 ----
+VBUSOK = 1
+ACTIVITY = 0
+COMP = 0
+CRC_CHK = 0
+ALERT = 0
+WAKE = 0
+BC_LVL1 = 1
+BC_LVL0 = 1
+
+---- STATUS1 ----
+RXSOP2 = 0
+RXSOP1 = 0
+RX_EMPTY = 1
+RX_FULL = 0
+TX_EMPTY = 1
+TX_FULL = 0
+OVRTEMP = 0
+OCP = 0
+
+---- STATUS0A ----
+SOFTFAIL = 0
+RETRYFAIL = 0
+POWER3 = 1
+POWER2 = 1
+SOFTRST = 0
+HARDRST = 0
+
+---- STATINT: GoodCRC Sent (Packet Received Confirmation).
+---- RX Message 0 ----
+PD Rx Header: 0x108F
+	MsgID: 0x00
+	Rev: PD3.0
+	Count: 1
+	Type: Unknown_CTRL
+Payload[0]: 0x20108FC0
+-----------------------
+---- RX Message 1 ----
+PD Rx Header: 0x108F
+	MsgID: 0x00
+	Rev: PD3.0
+	Count: 1
+	Type: Unknown_CTRL
+Payload[0]: 0x40108FC0
+-----------------------
+---- RX Message 2 ----
+PD Rx Header: 0x5DA1
+	MsgID: 0x06
+	Rev: PD3.0
+	Count: 5
+	Type: GoodCRC
+	PDO1: Fixed 43600mV @ 4800mA
+	PDO2: Fixed 50mV @ 10230mA
+	PDO3: Fixed 0mV @ 5200mA
+	PDO4: Fixed 650mV @ 7920mA
+	PDO5: Fixed 0mV @ 80mA
+-----------------------
+---- RX Message 3 ----
+PD Rx Header: 0x0000
+	MsgID: 0x00
+	Rev: PD1.0
+	Count: 0
+	Type: Unknown_DATA
+US1A ----
+TOGSS3 = 0
+TOGSS2 = 0
+TOGSS1 = 0
+RXSOP2DB = 0
+RXSOP1DB = 0
+RXSOP = 1
+
+---- Current FUSB302 State ----
+CC Polarity: 0
+VCONN Enabled: 0
+Pulling Down (UFP): 0
+RX Enable: 1
+MDAC VNC: 0x26
+MDAC RD: 0x05
+Device Attached: True
+---- End State ----
+VBUS Voltage: 420 mV
+CC voltage: 2688 mV
+[51919] --- End Status Update ---
+[55999] - Dettach detected
+[60806] - Attach detected
+[60812] - CC line on CC2
+[60823] --- Status Update ---
+---- STATUS0 ----
+VBUSOK = 1
+ACTIVITY = 0
+COMP = 0
+CRC_CHK = 0
+ALERT = 0
+WAKE = 0
+BC_LVL1 = 1
+BC_LVL0 = 1
+
+---- STATUS1 ----
+RXSOP2 = 0
+RXSOP1 = 0
+RX_EMPTY = 1
+RX_FULL = 0
+TX_EMPTY = 1
+TX_FULL = 0
+OVRTEMP = 0
+OCP = 0
+
+---- STATUS0A ----
+SOFTFAIL = 0
+RETRYFAIL = 0
+POWER3 = 1
+POWER2 = 1
+SOFTRST = 0
+HARDRST = 0
+
+---- STATUS1A ----
+TOGSS3 = 0
+TOGSS2 = 0
+TOGSS1 = 0
+RXSOP2DB = 0
+RXSOP1DB = 0
+RXSOP = 0
+
+---- Current FUSB302 State ----
+CC Polarity: 1
+VCONN Enabled: 0
+Pulling Down (UFP): 0
+RX Enable: 1
+MDAC VNC: 0x26
+MDAC RD: 0x05
+Device Attached: True
+---- End State INT: GoodCRC Sent (Packet Received Confirmation).
+---- RX Message 0 ----
+PD Rx Header: 0x108F
+	MsgID: 0x00
+	Rev: PD3.0
+	Count: 1
+	Type: Unknown_CTRL
+Payload[0]: 0x20108FC0
+-----------------------
+---- RX Message 1 ----
+PD Rx Header: 0x108F
+	MsgID: 0x00
+	Rev: PD3.0
+	Count: 1
+	Type: Unknown_CTRL
+Payload[0]: 0x40108FC0
+-----------------------
+---- RX Message 2 ----
+PD Rx Header: 0x5DA1
+	MsgID: 0x06
+	Rev: PD3.0
+	Count: 5
+	Type: GoodCRC
+	PDO1: Fixed 43600mV @ 4800mA
+	PDO2: Fixed 50mV @ 10230mA
+	PDO3: Fixed 0mV @ 5200mA
+	PDO4: Fixed 650mV @ 7920mA
+	PDO5: Fixed 0mV @ 80mA
+-----------------------
+---- RX Message 3 ----
+PD Rx Header: 0x108F
+	MsgID: 0x00
+	Rev: PD3.0
+	Count: 1
+	Type: Unknown_CTRL
+Payload[0]: 0x20108FC0
+-----------------------
+---- RX Message 4 ----
+PD Rx Header: 0x0000
+	MsgID: 0x00
+	Rev: PD1.0
+	Count: 0
+	Type: Unknown_DATA
+----
+VBUS Voltage: 420 mV
+CC voltage: 2688 mV
+[60957] --- End Status Update ---
+Logging paused. Entering debug menu...
+---- PD Logger Debug Console ----
+s
+[73754] --- Status Update ---
+---- STATUS0 ----
+VBUSOK = 1
+ACTIVITY = 1
+COMP = 0
+CRC_CHK = 0
+ALERT = 0
+WAKE = 0
+BC_LVL1 = 0
+BC_LVL0 = 1
+
+---- STATUS1 ----
+RXSOP2 = 0
+RXSOP1 = 0
+RX_EMPTY = 0
+RX_FULL = 0
+TX_EMPTY = 1
+TX_FULL = 0
+OVRTEMP = 0
+OCP = 0
+
+---- STATUS0A ----
+SOFTFAIL = 0
+RETRYFAIL = 0
+POWER3 = 1
+POWER2 = 1
+SOFTRST = 0
+HARDRST = 1
+
+---- STATUS1A ----
+TOGSS3 = 0
+TOGSS2 = 0
+TOGSS1 = 0
+RXSOP2DB = 0
+RXSOP1DB = 0
+RXSOP = 1
+
+---- SWITCHES0 ----
+PU_EN2 = 0
+PU_EN1 = 0
+VCONN_CC2 = 0
+VCONN_CC1 = 0
+MEAS_CC2 = 1
+MEAS_CC1 = 0
+PDWN2 = 1
+PDWN1 = 1
+
+---- SWITCHES1 ----
+POWERROLE = 0
+SPECREV1 = 0
+SPECREV0 = 1
+DATAROLE = 0
+AUTO_GCRC = 1
+TXCC2 = 1
+TXCC1 = 0
+
+---- CONTROL0 ----
+TX_FLUSH = 0
+INT_MASK = 0
+HOST_CUR1 = 0
+HOST_CUR0 = 1
+AUTO_PRE = 0
+TX_START = 0
+
+---- CONTROL1 ----
+ENSOP2DB = 1
+ENSOP1DB = 1
+BIST_MODE2 = 0
+RX_FLUSH = 0
+ENSOP2 = 1
+ENSOP1 = 1
+
+---- CONTROL2 ----
+TOG_SAVE_PWR2 = 0
+TOG_SAVE_PWR1 = 0
+TOG_RD_ONLY = 0
+WAKE_EN = 0
+MODE_1 = 0
+MODE_0 = 1
+TOGGLE = 0
+
+---- CONTROL3 ----
+SEND_HARDRESET = 0
+BIST_TMODE = 0
+AUTO_HARDRESET = 0
+AUTO_SOFTRESET = 0
+NRETRIES1 = 1
+NRETRIES0 = 1
+AUTO_RETRY = 1
+
+---- MASK ----
+VBUSOK = 1
+ACTIVITY = 1
+COMP_CHNG = 1
+CRC_CHK = 0
+ALERT = 0
+WAKE = 1
+COLLISION = 0
+BC_LVL = 1
+
+---- MASKA ----
+OCP_TEMP = 1
+TOGDONE = 1
+SOFTFAIL = 1
+RETRYFAIL = 0
+HARDSENT = 0
+TXSENT = 0
+SOFTRST = 1
+HARDRST = 0
+
+---- MASKB ----
+GCRCSENT = 0
+
+---- Current FUSB302 State ----
+CC Polarity: 1
+VCONN Enabled: 0
+Pulling Down (UFP): 0
+RX Enable: 1
+MDAC VNC: 0x26
+MDAC RD: 0x05
+Device Attached: True
+---- End State ----
+VBUS Voltage: 5040 mV
+CC voltage: 2688 mV
+[73979] --- End Status Update ---
+0000: 01 A0 00 FF A4 45 02 72 C0 4F 12 01 80 00 FF 90  | .....E.r.O......
+0010: 4E 67 21 E0 A1 51 2C 91 01 08 2C D1 02 00 2C B1  | Ng!..Q,...,...,.
+0020: 04 00 2C 41 06 00 3C 21 DC C0 AF D0 B1 CB 00 00  | ..,A..<!........
+0030: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  | ................
+0040: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  | ................
+> c
+---- RX Message 0 ----
+PD Rx Header: 0x108F
+	MsgID: 0x00
+	Rev: PD3.0
+	Count: 1
+	Type: Unknown_CTRL
+Payload[0]: 0x20108FC0
+-----------------------
+---- RX Message 1 ----
+PD Rx Header: 0x108F
+	MsgID: 0x00
+	Rev: PD3.0
+	Count: 1
+	Type: Unknown_CTRL
+Payload[0]: 0x40108FC0
+-----------------------
+---- RX Message 2 ----
+PD Rx Header: 0x5DA1
+	MsgID: 0x06
+	Rev: PD3.0
+	Count: 5
+	Type: GoodCRC
+	PDO1: Fixed 43600mV @ 4800mA
+	PDO2: Fixed 50mV @ 10230mA
+	PDO3: Fixed 0mV @ 5200mA
+	PDO4: Fixed 650mV @ 7920mA
+	PDO5: Fixed 0mV @ 80mA
+-----------------------
+---- RX Message 3 ----
+PD Rx Header: 0x108F
+	MsgID: 0x00
+	Rev: PD3.0
+	Count: 1
+	Type: Unknown_CTRL
+Payload[0]: 0x20108FC0
+-----------------------
+---- RX Message 4 ----
+PD Rx Header: 0x0000
+	MsgID: 0x00
+	Rev: PD1.0
+	Count: 0
+	Type: Unknown_DATA
+> q
+Returning to live logging...
+[121540] - Dettach detected
+[127047] - Attach detected
+[127053] - CC line on CC2
+[127064] --- Status Update ---
+---- STATUS0 ----
+VBUSOK = 1
+ACTIVITY = 0
+COMP = 0
+CRC_CHK = 0
+ALERT = 0
+WAKE = 0
+BC_LVL1 = 1
+BC_LVL0 = 1
+
+---- STATUS1 ----
+RXSOP2 = 0
+RXSOP1 = 0
+RX_EMPTY = 1
+RX_FULL = 0
+TX_EMPTY = 1
+TX_FULL = 0
+OVRTEMP = 0
+OCP = 0
+
+---- STATUS0A ----
+SOFTFAIL = 0
+RETRYFAIL = 0
+POWER3 = 1
+POWER2 = 1
+SOFTRST = 0
+HARDRST = 0
+
+---- STATUS1A ----
+TOGINT: GoodCRC Sent (Packet Received Confirmation).
+---- RX Message 0 ----
+PD Rx Header: 0x108F
+	MsgID: 0x00
+	Rev: PD3.0
+	Count: 1
+	Type: Unknown_CTRL
+Payload[0]: 0x20108FC0
+-----------------------
+---- RX Message 1 ----
+PD Rx Header: 0x108F
+	MsgID: 0x00
+	Rev: PD3.0
+	Count: 1
+	Type: Unknown_CTRL
+Payload[0]: 0x40108FC0
+-----------------------
+---- RX Message 2 ----
+PD Rx Header: 0x5DA1
+	MsgID: 0x06
+	Rev: PD3.0
+	Count: 5
+	Type: GoodCRC
+	PDO1: Fixed 43600mV @ 4800mA
+	PDO2: Fixed 50mV @ 10230mA
+	PDO3: Fixed 0mV @ 5200mA
+	PDO4: Fixed 650mV @ 7920mA
+	PDO5: Fixed 0mV @ 80mA
+-----------------------
+---- RX Message 3 ----
+PD Rx Header: 0x108F
+	MsgID: 0x00
+	Rev: PD3.0
+	Count: 1
+	Type: Unknown_CTRL
+Payload[0]: 0x20108FC0
+-----------------------
+---- RX Message 4 ----
+PD Rx Header: 0x108F
+	MsgID: 0x00
+	Rev: PD3.0
+	Count: 1
+	Type: Unknown_CTRL
+Payload[0]: 0x20108FC0
+-----------------------
+---- RX Message 5 ----
+PD Rx Header: 0x0000
+	MsgID: 0x00
+	Rev: PD1.0
+	Count: 0
+	Type: Unknown_DATA
+SS3 = 0
+TOGSS2 = 0
+TOGSS1 = 0
+RXSOP2DB = 0
+RXSOP1DB = 0
+RXSOP = 0
+
+---- Current FUSB302 State ----
+CC Polarity: 1
+VCONN Enabled: 0
+Pulling Down (UFP): 0
+RX Enable: 1
+MDAC VNC: 0x26
+MDAC RD: 0x05
+Device Attached: True
+---- End State ----
+VBUS Voltage: 420 mV
+CC voltage: 2688 mV
+[127198] --- End Status Update ---
+Logging paused. Entering debug menu...
+---- PD Logger Debug Console ----
+s
+[145925] --- Status Update ---
+---- STATUS0 ----
+VBUSOK = 1
+ACTIVITY = 0
+COMP = 0
+CRC_CHK = 0
+ALERT = 0
+WAKE = 0
+BC_LVL1 = 1
+BC_LVL0 = 1
+
+---- STATUS1 ----
+RXSOP2 = 0
+RXSOP1 = 0
+RX_EMPTY = 0
+RX_FULL = 0
+TX_EMPTY = 1
+TX_FULL = 0
+OVRTEMP = 0
+OCP = 0
+
+---- STATUS0A ----
+SOFTFAIL = 0
+RETRYFAIL = 0
+POWER3 = 1
+POWER2 = 1
+SOFTRST = 0
+HARDRST = 1
+
+---- STATUS1A ----
+TOGSS3 = 0
+TOGSS2 = 0
+TOGSS1 = 0
+RXSOP2DB = 0
+RXSOP1DB = 0
+RXSOP = 1
+
+---- SWITCHES0 ----
+PU_EN2 = 0
+PU_EN1 = 0
+VCONN_CC2 = 0
+VCONN_CC1 = 0
+MEAS_CC2 = 1
+MEAS_CC1 = 0
+PDWN2 = 1
+PDWN1 = 1
+
+---- SWITCHES1 ----
+POWERROLE = 0
+SPECREV1 = 0
+SPECREV0 = 1
+DATAROLE = 0
+AUTO_GCRC = 1
+TXCC2 = 1
+TXCC1 = 0
+
+---- CONTROL0 ----
+TX_FLUSH = 0
+INT_MASK = 0
+HOST_CUR1 = 0
+HOST_CUR0 = 1
+AUTO_PRE = 0
+TX_START = 0
+
+---- CONTROL1 ----
+ENSOP2DB = 1
+ENSOP1DB = 1
+BIST_MODE2 = 0
+RX_FLUSH = 0
+ENSOP2 = 1
+ENSOP1 = 1
+
+---- CONTROL2 ----
+TOG_SAVE_PWR2 = 0
+TOG_SAVE_PWR1 = 0
+TOG_RD_ONLY = 0
+WAKE_EN = 0
+MODE_1 = 0
+MODE_0 = 1
+TOGGLE = 0
+
+---- CONTROL3 ----
+SEND_HARDRESET = 0
+BIST_TMODE = 0
+AUTO_HARDRESET = 0
+AUTO_SOFTRESET = 0
+NRETRIES1 = 1
+NRETRIES0 = 1
+AUTO_RETRY = 1
+
+---- MASK ----
+VBUSOK = 1
+ACTIVITY = 1
+COMP_CHNG = 1
+CRC_CHK = 0
+ALERT = 0
+WAKE = 1
+COLLISION = 0
+BC_LVL = 1
+
+---- MASKA ----
+OCP_TEMP = 1
+TOGDONE = 1
+SOFTFAIL = 1
+RETRYFAIL = 0
+HARDSENT = 0
+TXSENT = 0
+SOFTRST = 1
+HARDRST = 0
+
+---- MASKB ----
+GCRCSENT = 0
+
+---- Current FUSB302 State ----
+CC Polarity: 1
+VCONN Enabled: 0
+Pulling Down (UFP): 0
+RX Enable: 1
+MDAC VNC: 0x26
+MDAC RD: 0x05
+Device Attached: True
+---- End State ----
+VBUS Voltage: 5040 mV
+CC voltage: 2688 mV
+[146150] --- End Status Update ---
+0000: 01 A0 00 FF A4 45 02 72 C0 4F 12 01 80 00 FF 90  | .....E.r.O......
+0010: 4E 67 21 E0 A1 51 2C 91 01 08 2C D1 02 00 2C B1  | Ng!..Q,...,...,.
+0020: 04 00 2C 41 06 00 3C 21 DC C0 AF D0 B1 CB 00 00  | ..,A..<!........
+0030: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  | ................
+0040: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  | ................
+> q
+Returning to live logging...
+[160733] - Dettach detected
