@@ -1343,7 +1343,7 @@ static void pd_log_header(uint16_t header)
     if (cnt > 0)
         usart_printf("\tType: %s\r\n", pd_data_msg_name(type));
     else
-        usart_printf("\tType: %s\r\n", pd_ctl_msg_name(type));
+        usart_printf("\tType: %s\r\n", pd_ctrl_msg_name(type));
 }
 
 static void pd_log_source_caps(const uint32_t *pdo, int count)
