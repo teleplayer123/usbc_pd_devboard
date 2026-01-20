@@ -58,6 +58,14 @@
 #define PD_RST2 0x19
 #define PD_EOP 0x0D
 
+#define PD_PDO_TYPE_POS 				30
+#define PD_PDO_TYPE_MASK				(0x03 << PD_PDO_TYPE_POS)
+#define PD_PDO_TYPE_FIXED				(uint32_t)(0 << PD_PDO_TYPE_POS)
+#define PD_SRC_PDO_FIXED_MAX_CURR_POS	0
+#define PD_SRC_PDO_FIXED_MAX_CURR_MASK	(0x3FF << PD_SRC_PDO_FIXED_MAX_CURR_POS)
+#define PD_SRC_PDO_FIXED_VOLT_POS		10
+#define PD_SRC_PDO_FIXED_VOLT_MASK		(0x3FF << PD_SRC_PDO_FIXED_VOLT_POS)
+
 #define ARRAY_SIZE(t) (sizeof(t) / sizeof(t[0]))
 
 #define PDO_FIXED_DUAL_ROLE (1 << 29) // Dual role device

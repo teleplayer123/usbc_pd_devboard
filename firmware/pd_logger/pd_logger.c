@@ -1366,12 +1366,12 @@ static void pd_log_source_caps(const uint32_t *pdo, int count)
     for (int i = 0; i < count; i++) {
         uint32_t p = pdo[i];
 
-        uint8_t type = (p >> 30) & 0x3;
+        uint8_t type = p & PD_PDO_TYPE_MASK;
 
-        if (type == 0) { // Fixed
-            int mv = ((p >> 10) & 0x3FF) * 50;
-            int ma = (p & 0x3FF) * 10;
-            usart_printf("\tPDO%d: Fixed %dmV @ %dmA\r\n", i + 1, mv, ma);
+        if (type == PD_PDO_TYPE_FIXED) {
+            uint32_t mv = ((p & PD_SRC_PDO_FIXED_VOLT_MASK) >> PD_SRC_PDO_FIXED_VOLT_POS) * 50;
+            uint32_t ma = ((p & PD_SRC_PDO_FIXED_MAX_CURR_MASK) >> PD_SRC_PDO_FIXED_MAX_CURR_POS) * 10;
+            usart_printf("\tPDO%d: Fixed %2dV @ %2d.%dA\r\n", i + 1, (int)(mv/1000), (int)(ma/1000), (int)((ma%1000)/100));
         } else {
             usart_printf("\tPDO%d: Unsupported PDO type %u\r\n", i + 1, type);
         }
