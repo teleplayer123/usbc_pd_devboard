@@ -1,2 +1,3 @@
+- pd_log_source_caps function: check calculations correct and look into "unknown PDO type"
 - add drp functionality 
 - make source firmware for testing devices
