@@ -1273,6 +1273,9 @@ static void fusb_setup(void)
     reg &= ~FUSB302_CTL0_INT_MASK;
     fusb_write(FUSB302_REG_CONTROL0, reg);
 
+    // CONTROL1 Flush Rx FIFO
+    fusb_flush_rx_fifo();
+
     // Set state defaults
     state.vconn_enabled = 0;
     state.cc_polarity = 0;
@@ -1600,7 +1603,6 @@ void exti4_15_isr(void) {
             usart_printf("INT: Hard Reset Received.\r\n");
             // Hard reset requires clearing state and re-initializing fusb302
             fusb_reset();
-            fusb_flush_rx_fifo();
             fusb_setup();
             pd_init(state.pulling_up);
         }
@@ -1667,8 +1669,6 @@ static void poll(void)
                 usart_printf("[%d] - Dettach detected\r\n", system_millis);
                 // reset fusb302
                 fusb_reset();
-                // flush rx fifo after dettach
-                fusb_flush_rx_fifo();
                 // set default state
                 fusb_setup();
                 pd_init(0);
