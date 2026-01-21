@@ -1471,8 +1471,10 @@ static void pd_dump_rx_messages(bool verbose)
             case 0x01:
                 // source capabilities
                 pd_log_source_caps(rx_messages[i].payload, cnt);
-                for (int j = 0; j < cnt; j++)
-                    usart_printf("Payload[%d]: 0x%08X\r\n", j, rx_messages[i].payload[j]);
+                if (verbose) {
+                    for (int j = 0; j < cnt; j++)
+                        usart_printf("Payload[%d]: 0x%08X\r\n", j, rx_messages[i].payload[j]);
+                }
                 break;
             case 0x02:
                 // request
