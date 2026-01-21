@@ -1,0 +1,183 @@
+[88908] - Attach detected
+[88914] - CC line on CC2
+[88925] --- Status Update ---
+---- Current FUSB302 State ----
+CC Polarity: 1
+VCONN Enabled: 0
+Pulling Down (UFP): 0
+RX Enable: 1
+MDAC VNC: 0x26
+MDAC RD: 0x05
+Device Attached: True
+---- End State ----
+VBUS Voltage: 5040 mV
+CC voltage: 2688 mV
+[89018] --- End Status Update ---
+INT: GoodCRC Sent (Packet Received)
+0000: 2C 91 01 0A 2C D1 02 00 2C B1 04 00 2C 41 06 00  | ,...,...,...,A..
+0010: 01 00                                            | ..
+---- RX Message 0 ----
+PD Rx Header: 0x41A1
+	MsgID: 0x00
+	Rev: PD3.0
+	Count: 4
+	Type: Source_Capabilities
+	PDO1: Fixed  5V @  3.0A
+	PDO2: Fixed  9V @  3.0A
+	PDO3: Fixed 15V @  3.0A
+	PDO4: Fixed 20V @  3.0A
+Payload[0]: 0x0A01912C
+Payload[1]: 0x0002D12C
+Payload[2]: 0x0004B12C
+Payload[3]: 0x0006412C
+-----------------------
+INT: CC line tripped threshold programmed into MDAC (BC_LVL=0x03)
+Logging paused. Entering debug menu...
+---- PD Logger Debug Console ----
+s
+[97720] --- Status Update ---
+---- STATUS0 ----
+VBUSOK = 1
+ACTIVITY = 0
+COMP = 0
+CRC_CHK = 0
+ALERT = 0
+WAKE = 0
+BC_LVL1 = 1
+BC_LVL0 = 1
+
+---- STATUS1 ----
+RXSOP2 = 0
+RXSOP1 = 0
+RX_EMPTY = 1
+RX_FULL = 0
+TX_EMPTY = 1
+TX_FULL = 0
+OVRTEMP = 0
+OCP = 0
+
+---- STATUS0A ----
+SOFTFAIL = 0
+RETRYFAIL = 0
+POWER3 = 1
+POWER2 = 1
+SOFTRST = 0
+HARDRST = 1
+
+---- STATUS1A ----
+TOGSS3 = 0
+TOGSS2 = 0
+TOGSS1 = 0
+RXSOP2DB = 0
+RXSOP1DB = 0
+RXSOP = 1
+
+---- SWITCHES0 ----
+PU_EN2 = 0
+PU_EN1 = 0
+VCONN_CC2 = 0
+VCONN_CC1 = 0
+MEAS_CC2 = 1
+MEAS_CC1 = 0
+PDWN2 = 1
+PDWN1 = 1
+
+---- SWITCHES1 ----
+POWERROLE = 0
+SPECREV1 = 0
+SPECREV0 = 1
+DATAROLE = 0
+AUTO_GCRC = 1
+TXCC2 = 1
+TXCC1 = 0
+
+---- CONTROL0 ----
+TX_FLUSH = 0
+INT_MASK = 0
+HOST_CUR1 = 0
+HOST_CUR0 = 1
+AUTO_PRE = 0
+TX_START = 0
+
+---- CONTROL1 ----
+ENSOP2DB = 0
+ENSOP1DB = 0
+BIST_MODE2 = 0
+RX_FLUSH = 0
+ENSOP2 = 0
+ENSOP1 = 0
+
+---- CONTROL2 ----
+TOG_SAVE_PWR2 = 0
+TOG_SAVE_PWR1 = 0
+TOG_RD_ONLY = 0
+WAKE_EN = 0
+MODE_1 = 0
+MODE_0 = 1
+TOGGLE = 0
+
+---- CONTROL3 ----
+SEND_HARDRESET = 0
+BIST_TMODE = 0
+AUTO_HARDRESET = 0
+AUTO_SOFTRESET = 0
+NRETRIES1 = 1
+NRETRIES0 = 1
+AUTO_RETRY = 1
+
+---- MASK ----
+VBUSOK = 1
+ACTIVITY = 1
+COMP_CHNG = 1
+CRC_CHK = 0
+ALERT = 0
+WAKE = 1
+COLLISION = 0
+BC_LVL = 1
+
+---- MASKA ----
+OCP_TEMP = 1
+TOGDONE = 1
+SOFTFAIL = 1
+RETRYFAIL = 0
+HARDSENT = 0
+TXSENT = 0
+SOFTRST = 1
+HARDRST = 0
+
+---- MASKB ----
+GCRCSENT = 0
+
+---- Current FUSB302 State ----
+CC Polarity: 1
+VCONN Enabled: 0
+Pulling Down (UFP): 0
+RX Enable: 1
+MDAC VNC: 0x26
+MDAC RD: 0x05
+Device Attached: True
+---- End State ----
+VBUS Voltage: 5040 mV
+CC voltage: 2688 mV
+[97944] --- End Status Update ---
+> c
+---- RX Message 0 ----
+PD Rx Header: 0x41A1
+	MsgID: 0x00
+	Rev: PD3.0
+	Count: 4
+	Type: Source_Capabilities
+	PDO1: Fixed  5V @  3.0A
+	PDO2: Fixed  9V @  3.0A
+	PDO3: Fixed 15V @  3.0A
+	PDO4: Fixed 20V @  3.0A
+Payload[0]: 0x0A01912C
+Payload[1]: 0x0002D12C
+Payload[2]: 0x0004B12C
+Payload[3]: 0x0006412C
+0000: 2C 91 01 0A 2C D1 02 00 2C B1 04 00 2C 41 06 00  | ,...,...,...,A..
+0010: 01 00                                            | ..
+-----------------------
+> q
+Returning to live logging...
+[198415] - Dettach detected
