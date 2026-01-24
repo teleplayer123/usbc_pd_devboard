@@ -1,4 +1,3 @@
-#pragma once
 #include <libopencm3/usb/usbd.h>
 #include <stdint.h>
 #include <stddef.h>

@@ -26,18 +26,18 @@ static void clock_setup(void)
     rcc_clock_setup_in_hsi_out_48mhz();
     rcc_periph_clock_enable(RCC_GPIOA);
     rcc_periph_clock_enable(RCC_GPIOB);
-    rcc_periph_clock_enable(RCC_USB);
     rcc_periph_clock_enable(RCC_I2C1);
     // Enable the clock for SYSCFG to configure EXTI.
     // rcc_periph_clock_enable(RCC_SYSCFG_COMP);
-    /* Clock Setup for F072 Crystal-less USB */
-    rcc_periph_clock_enable(RCC_CRS);
-    crs_autotrim_usb_enable(); // Enable auto-trimming from USB SOF
-    rcc_set_usbclk_source(RCC_HSI48);
+
 }
 
 static void usb_setup(void)
 {
+    /* Clock Setup for F072 Crystal-less USB */
+    rcc_periph_clock_enable(RCC_CRS);
+    crs_autotrim_usb_enable(); // Enable auto-trimming from USB SOF
+    rcc_set_usbclk_source(RCC_HSI48);
     gpio_mode_setup(GPIOA, GPIO_MODE_AF, GPIO_PUPD_NONE, GPIO11 | GPIO12);
     gpio_set_af(GPIOA, GPIO_AF0, GPIO11 | GPIO12);
 }
@@ -132,11 +132,12 @@ static void cdcacm_rx_cb(uint8_t *buf, int len) {
 int main(void) {
     clock_setup();
     systick_setup();
-    usb_setup();
     i2c_setup();
+    usb_setup();
     usbdev = usb_cdcacm_init(cdcacm_rx_cb);
 
-    usb_printf("---- PD Debugger ----\r\n");
+	for (int i = 0; i < 0x800000; i++)
+		__asm__("nop");
 
     while (1) {
         usb_printf("%d\r\n", system_millis);
