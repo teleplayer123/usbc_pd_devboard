@@ -2,6 +2,7 @@
 #include <libopencm3/stm32/gpio.h>
 #include <libopencm3/usb/usbd.h>
 #include <libopencm3/usb/cdc.h>
+#include <stdio.h>
 #include "usb_cdcacm.h"
 
 static usbd_device *cdcacm_dev;
@@ -176,8 +177,8 @@ static const struct usb_config_descriptor config = {
 };
 
 static const char *usb_strings[] = {
-    "Cole's Lab",
-    "STM32F072 USB-I2C Bridge",
+    "PD Debugger",
+    "USB-I2C Bridge",
     "123456",
 };
 
@@ -198,10 +199,6 @@ static void cdcacm_set_config(usbd_device *usbd_dev, uint16_t wValue)
 
 usbd_device *usb_cdcacm_init(void (*rx_cb)(uint8_t *buf, int len))
 {
-    rcc_periph_clock_enable(RCC_GPIOA);
-    gpio_mode_setup(GPIOA, GPIO_MODE_AF, GPIO_PUPD_NONE, GPIO11 | GPIO12);
-    gpio_set_af(GPIOA, GPIO_AF0, GPIO11 | GPIO12);
-
     cdcacm_rx_cb_user = rx_cb;
     cdcacm_dev = usbd_init(&st_usbfs_v2_usb_driver, &dev_descr, &config,
                            usb_strings, 3, usbd_control_buffer, sizeof(usbd_control_buffer));
@@ -212,4 +209,22 @@ usbd_device *usb_cdcacm_init(void (*rx_cb)(uint8_t *buf, int len))
 void usb_cdcacm_write(uint8_t *buf, int len)
 {
     usbd_ep_write_packet(cdcacm_dev, 0x82, buf, len);
+}
+
+/* Updated Printf function for USB */
+int usb_printf(const char *format, ...) {
+    char buf[256];
+    va_list args;
+    va_start(args, format);
+    int len = vsnprintf(buf, sizeof(buf), format, args);
+    va_end(args);
+
+    /* Send via Bulk In endpoint 0x82 */
+    int sent = 0;
+    while (sent < len) {
+        int chunk = (len - sent > 64) ? 64 : (len - sent);
+        while (usbd_ep_write_packet(cdcacm_dev, 0x82, &buf[sent], chunk) == 0);
+        sent += chunk;
+    }
+    return len;
 }

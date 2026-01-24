@@ -9,7 +9,6 @@
 #include <libopencm3/cm3/cortex.h>
 #include <libopencm3/cm3/systick.h>
 #include <stdio.h>
-#include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
 #include "fusb302.h"
@@ -25,7 +24,7 @@ void sys_tick_handler(void)
 static void clock_setup(void)
 {
     rcc_clock_setup_in_hsi_out_48mhz();
-    // rcc_periph_clock_enable(RCC_GPIOA);
+    rcc_periph_clock_enable(RCC_GPIOA);
     rcc_periph_clock_enable(RCC_GPIOB);
     rcc_periph_clock_enable(RCC_USB);
     rcc_periph_clock_enable(RCC_I2C1);
@@ -35,6 +34,12 @@ static void clock_setup(void)
     rcc_periph_clock_enable(RCC_CRS);
     crs_autotrim_usb_enable(); // Enable auto-trimming from USB SOF
     rcc_set_usbclk_source(RCC_HSI48);
+}
+
+static void usb_setup(void)
+{
+    gpio_mode_setup(GPIOA, GPIO_MODE_AF, GPIO_PUPD_NONE, GPIO11 | GPIO12);
+    gpio_set_af(GPIOA, GPIO_AF0, GPIO11 | GPIO12);
 }
 
 static void i2c_setup(void)
@@ -99,24 +104,6 @@ int _write(int fd, char *ptr, int len)
     return 0;
 }
 
-/* Updated Printf function for USB */
-int usb_printf(const char *format, ...) {
-    char buf[256];
-    va_list args;
-    va_start(args, format);
-    int len = vsnprintf(buf, sizeof(buf), format, args);
-    va_end(args);
-
-    /* Send via Bulk In endpoint 0x82 */
-    int sent = 0;
-    while (sent < len) {
-        int chunk = (len - sent > 64) ? 64 : (len - sent);
-        while (usbd_ep_write_packet(usbdev, 0x82, &buf[sent], chunk) == 0);
-        sent += chunk;
-    }
-    return len;
-}
-
 static void cdcacm_rx_cb(uint8_t *buf, int len) {
     /* Simple command parser: r <reg> | w <reg> <val> */
     if (len < 2) return;
@@ -145,6 +132,7 @@ static void cdcacm_rx_cb(uint8_t *buf, int len) {
 int main(void) {
     clock_setup();
     systick_setup();
+    usb_setup();
     i2c_setup();
     usbdev = usb_cdcacm_init(cdcacm_rx_cb);
 
