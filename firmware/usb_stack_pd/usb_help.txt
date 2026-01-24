@@ -159,11 +159,6 @@ int main(void) {
     while (1) {
         /* Poll the USB stack as often as possible */
         usbd_poll(usbd_dev);
-
-        if (fusb_event_pending) {
-            fusb_handle_irq(); // Now internal calls use usb_printf!
-            fusb_event_pending = false;
-        }
     }
 }
 

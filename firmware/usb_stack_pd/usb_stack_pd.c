@@ -3,26 +3,34 @@
 #include <libopencm3/stm32/i2c.h>
 #include <libopencm3/usb/usbd.h>
 #include <libopencm3/usb/cdc.h>
+#include <libopencm3/stm32/crs.h>
 #include <libopencm3/stm32/exti.h>
 #include <libopencm3/cm3/nvic.h>
 #include <libopencm3/cm3/cortex.h>
 #include <libopencm3/cm3/systick.h>
 #include <stdio.h>
+#include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
 #include "fusb302.h"
 #include "usb_cdcacm.h"
 
+volatile uint32_t system_millis;
+
+void sys_tick_handler(void)
+{
+    system_millis++;
+}
 
 static void clock_setup(void)
 {
     rcc_clock_setup_in_hsi_out_48mhz();
-    rcc_periph_clock_enable(RCC_GPIOA);
+    // rcc_periph_clock_enable(RCC_GPIOA);
     rcc_periph_clock_enable(RCC_GPIOB);
     rcc_periph_clock_enable(RCC_USB);
     rcc_periph_clock_enable(RCC_I2C1);
     // Enable the clock for SYSCFG to configure EXTI.
-    rcc_periph_clock_enable(RCC_SYSCFG_COMP);
+    // rcc_periph_clock_enable(RCC_SYSCFG_COMP);
     /* Clock Setup for F072 Crystal-less USB */
     rcc_periph_clock_enable(RCC_CRS);
     crs_autotrim_usb_enable(); // Enable auto-trimming from USB SOF
@@ -53,16 +61,16 @@ static void systick_setup(void)
     systick_interrupt_enable();
 }
 
-static void exti_setup(void)
-{
-    // Map PB8 to EXTI8
-    exti_select_source(EXTI8, GPIOB);
-    // Set EXTI8 to trigger on a falling edge (INT_N is active-low)
-    exti_set_trigger(EXTI8, EXTI_TRIGGER_FALLING);
-    // Enable EXTI8 interrupt line
-    exti_enable_request(EXTI8);
-    nvic_enable_irq(NVIC_EXTI4_15_IRQ); 
-}
+// static void exti_setup(void)
+// {
+//     // Map PB8 to EXTI8
+//     exti_select_source(EXTI8, GPIOB);
+//     // Set EXTI8 to trigger on a falling edge (INT_N is active-low)
+//     exti_set_trigger(EXTI8, EXTI_TRIGGER_FALLING);
+//     // Enable EXTI8 interrupt line
+//     exti_enable_request(EXTI8);
+//     nvic_enable_irq(NVIC_EXTI4_15_IRQ); 
+// }
 
 static void fusb_read(uint8_t reg, uint8_t *val) {
     i2c_transfer7(I2C1, FUSB302_ADDR, &reg, 1, val, 1);
@@ -143,6 +151,7 @@ int main(void) {
     usb_printf("---- PD Debugger ----\r\n");
 
     while (1) {
+        usb_printf("%d\r\n", system_millis);
         usbd_poll(usbdev);
     }
 }
